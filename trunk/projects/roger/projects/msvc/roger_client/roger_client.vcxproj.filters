@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="源文件\src">
+      <UniqueIdentifier>{5839c690-0265-4c6d-9cfd-73ba532b313e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\src\shared">
+      <UniqueIdentifier>{d1958e52-dd3a-47b8-a582-e1fab6dfcafc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\src\client">
+      <UniqueIdentifier>{7b973840-dfd3-44cd-9ea8-f98163293669}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\roger\client\client.cpp">
+      <Filter>源文件\src\client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\roger\client\proxy_http.cpp">
+      <Filter>源文件\src\client</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\roger\client\client_node.hpp">
+      <Filter>源文件\src\client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\roger\shared\shared.hpp">
+      <Filter>源文件\src\shared</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

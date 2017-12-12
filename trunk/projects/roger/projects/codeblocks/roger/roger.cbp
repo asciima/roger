@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="roger" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/roger" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option parameters="0.0.0.0 12120 wcp" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="-rdynamic" />
+					<Add option="-DDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add library="../../../../../libs/wawo/svn/wawo/projects/codeblocks/wawo/bin/Debug/libwawo.a" />
+					<Add library="../../../../../libs/udns/udns-0.4/codeblocks/udns/bin/Debug/libudns.a" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/roger" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option parameters="0.0.0.0 12120 wcp" />
+				<Compiler>
+					<Add option="-O3" />
+					<Add option="-rdynamic" />
+					<Add option="-DNDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add library="../../../../../libs/wawo/svn/wawo/projects/codeblocks/wawo/bin/Release/libwawo.a" />
+					<Add library="../../../../../libs/udns/udns-0.4/codeblocks/udns/bin/Release/libudns.a" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="-std=c++11" />
+			<Add option="-m64" />
+			<Add option="-g" />
+			<Add option="-fexceptions -rdynamic" />
+			<Add option="-DHAVE_CONFIG_H" />
+			<Add option="-DROGER_SERVER" />
+			<Add directory="../../../../../libs/wawo/svn/wawo/include" />
+			<Add directory="../../../../../libs/udns/udns-0.4" />
+		</Compiler>
+		<Linker>
+			<Add option="-m64" />
+			<Add option="-lpthread -rdynamic" />
+		</Linker>
+		<Unit filename="../../../src/roger/dns_resolver.hpp" />
+		<Unit filename="../../../src/roger/issue.txt" />
+		<Unit filename="../../../src/roger/server/dns_resolver.hpp" />
+		<Unit filename="../../../src/roger/server/server.cpp" />
+		<Unit filename="../../../src/roger/server/server_node.hpp" />
+		<Unit filename="../../../src/roger/server_node.hpp" />
+		<Unit filename="../../../src/roger/shared.hpp" />
+		<Unit filename="../../../src/xxtea/xxtea.h" />
+		<Extensions>
+			<code_completion />
+			<debugger>
+				<remote_debugging target="Debug">
+					<options conn_type="0" serial_baud="115200" additional_cmds_before="handle SIGPIPE nostop noprint pass" />
+				</remote_debugging>
+				<remote_debugging target="Release">
+					<options conn_type="0" serial_baud="115200" additional_cmds_before="handle SIGPIPE nostop noprint pass" />
+				</remote_debugging>
+			</debugger>
+			<envvars />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

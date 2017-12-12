@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_workspace_file>
+	<Workspace title="Workspace">
+		<Project filename="roger.cbp" />
+		<Project filename="../../../../../libs/wawo/svn/wawo/projects/codeblocks/wawo/wawo.cbp" />
+		<Project filename="../../../../../libs/udns/udns-0.4/codeblocks/udns/udns.cbp" />
+	</Workspace>
+</CodeBlocks_workspace_file>
