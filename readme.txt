@@ -1,4 +1,13 @@
-﻿这是一套由客户端和服务器组成的可靠UDP测试程序
+﻿
+
+git clone git@github.com:ycopy/roger.git
+cd roger
+git submodule init
+git submodule update --remote
+
+
+
+这是一套由客户端和服务器组成的可靠UDP测试程序
 
 服务器环境需求：centos7 x64
 
