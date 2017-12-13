@@ -1,3 +1,6 @@
 [submodule "trunk/libs/wawo"]
 	path = trunk/libs/wawo
 	url = git@github.com:ycopy/wawo.git
+[submodule "trunk/libs/udns"]
+	path = trunk/libs/udns
+	url = git@github.com:ycopy/udns.git
