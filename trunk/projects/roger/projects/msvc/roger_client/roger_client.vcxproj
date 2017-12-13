@@ -85,17 +85,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\libs\wawo\svn\wawo\projects\msvc\wawo.2015.vcxproj">
-      <Project>{cdce0809-6c77-480b-8912-09c043b9c268}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\..\..\src\roger\client\client.cpp" />
     <ClCompile Include="..\..\..\src\roger\client\proxy_http.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\roger\client\client_node.hpp" />
     <ClInclude Include="..\..\..\src\roger\shared\shared.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\libs\wawo\projects\msvc\wawo.2015.vcxproj">
+      <Project>{cdce0809-6c77-480b-8912-09c043b9c268}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

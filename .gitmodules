@@ -4,3 +4,6 @@
 [submodule "trunk/libs/udns"]
 	path = trunk/libs/udns
 	url = git@github.com:ycopy/udns.git
+[submodule "trunk/libs/vld"]
+	path = trunk/libs/vld
+	url = git@github.com:ycopy/vld.git
