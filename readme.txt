@@ -12,13 +12,13 @@ git submodule update --remote
 服务器环境需求：centos7 x64
 
 服务器启动:
-nohup ./roger_server.x68_64_release ip port wcp > /dev/null &
+nohup ./roger_server.x86_64_release ip port wcp > /dev/null &
 
 ip: 0.0.0.0 [wildcard]
 port: (1024---65535]
 
 example:
-nohup ./roger_server.x68_64_release 0.0.0.0 13625 wcp > /dev/null &
+nohup ./roger_server.x86_64_release 0.0.0.0 13625 wcp > /dev/null &
 
 客户端启动: 
 1, 编辑start_roger_wcp.bat
