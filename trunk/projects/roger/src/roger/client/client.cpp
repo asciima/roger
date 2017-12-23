@@ -19,9 +19,6 @@
 
 int main(int argc, char** argv) {
 
-
-
-
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
 	_Test_VLD();
 #endif
