@@ -25,7 +25,10 @@ int main(int argc, char** argv) {
 
 	WAWO_WARN("[roger]client start...");
 	if (argc != 4) {
-		WAWO_ERR("[roger]invalid parameter, usage: roger server_ip port");
+		WAWO_ERR("[roger]invalid parameter, usage: roger server_ip port" );
+		for (int i = 0; i < argc; ++i) {
+			WAWO_INFO("args[%d] = %s", i, *(argv + i));
+		}
 		return -1;
 	}
 

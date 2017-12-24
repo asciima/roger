@@ -1550,7 +1550,7 @@ The document has moved\
 				pctx->conn_map.clear();
 			}
 
-			WAWO_INFO("[roger][#%u:%s]client close, local addr: %s", evt->so->get_fd(), evt->so->get_remote_addr().address_info().cstr, evt->so->get_local_addr().address_info().cstr);
+			WAWO_INFO("[roger][#%u:%s]client close", evt->so->get_fd(), evt->so->get_remote_addr().address_info().cstr );
 		}
 
 		void on_socket_read_shutdown(WWRP<cp_evt_t> const& evt) {
