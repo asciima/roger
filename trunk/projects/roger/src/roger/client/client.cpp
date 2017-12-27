@@ -19,7 +19,9 @@
 
 int main(int argc, char** argv) {
 
-
+//	int a = 5;
+//	int b = 3;
+//	WAWO_ASSERT(a < b, "a=%d, b=%d", a, b);
 
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
