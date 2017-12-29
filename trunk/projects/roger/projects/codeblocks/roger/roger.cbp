@@ -30,11 +30,11 @@
 				<Option parameters="0.0.0.0 12120 wcp" />
 				<Compiler>
 					<Add option="-O3" />
-					<Add option="-rdynamic" />
 					<Add option="-DNDEBUG" />
 				</Compiler>
 				<Linker>
-					<Add library="../../../../../libs/wawo/svn/wawo/projects/codeblocks/wawo/bin/Release/libwawo.a" />
+					<Add option="-s" />
+					<Add library="../../../../../libs/wawo/projects/codeblocks/wawo/bin/Release/libwawo.a" />
 					<Add library="../../../../../libs/udns/udns-0.4/codeblocks/udns/bin/Release/libudns.a" />
 				</Linker>
 			</Target>
@@ -43,16 +43,15 @@
 			<Add option="-Wall" />
 			<Add option="-std=c++11" />
 			<Add option="-m64" />
-			<Add option="-g" />
-			<Add option="-fexceptions -rdynamic" />
+			<Add option="-fexceptions" />
 			<Add option="-DHAVE_CONFIG_H" />
 			<Add option="-DROGER_SERVER" />
-			<Add directory="../../../../../libs/wawo/svn/wawo/include" />
+			<Add directory="../../../../../libs/wawo/include" />
 			<Add directory="../../../../../libs/udns/udns-0.4" />
 		</Compiler>
 		<Linker>
 			<Add option="-m64" />
-			<Add option="-lpthread -rdynamic" />
+			<Add option="-lpthread" />
 		</Linker>
 		<Unit filename="../../../src/roger/dns_resolver.hpp" />
 		<Unit filename="../../../src/roger/issue.txt" />

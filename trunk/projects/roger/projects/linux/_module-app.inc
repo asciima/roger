@@ -61,7 +61,7 @@ $(SERVER_TARGET): $(APP_ALL_O_FILES_SERVER)
 	@echo "---"
 	@echo \*\* assembling $(SERVER_TARGET)...
 	@echo $(CXX) $^ -o $@ $(LINK_LIBS)
-	@$(CXX) -rdynamic $^ -o $@ $(LINK_LIBS) 
+	@$(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS) 
 	@echo "---"
 	
 $(CLIENT_TARGET): $(APP_ALL_O_FILES_CLIENT)
@@ -71,8 +71,8 @@ $(CLIENT_TARGET): $(APP_ALL_O_FILES_CLIENT)
 	
 	@echo "---"
 	@echo \*\* assembling $(CLIENT_TARGET)...
-	@echo $(CXX) $^ -o $@ $(LINK_LIBS)
-	@$(CXX) $^ -o $@ $(LINK_LIBS)
+	@echo $(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS)
+	@$(CXX) -s $^ -o $@ $(LINK_LIBS)
 	
 	@cp -f $(APP_PROXY_PAC_PATH) $(APP_BUILD_TARGET_PATH)
 	@echo "---"

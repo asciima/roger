@@ -17,12 +17,15 @@ endif
 DEFINES := $(DEFINES)
 CC_MISC := -std=c++11
 
+LINK_MISC := $(LINK_MISC)
+
 ifeq ($(PRJ_BUILD),debug)
 	DEFINES := $(DEFINES) DEBUG
 	CC_MISC:=$(CC_MISC) -g -Wall -fexceptions -O0
 else
 	DEFINES := $(DEFINES) RELEASE
 	CC_MISC := $(CC_MISC) -fexpensive-optimizations -O3
+	LINK_MISC := $(LINK_MISC) -s
 endif
 
 ifeq ($(PRJ_ARCH),x86_64)
