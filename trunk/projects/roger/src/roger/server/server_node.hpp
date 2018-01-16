@@ -224,21 +224,37 @@ namespace roger {
 				TRACE_SERVER_STREAM("[server][s%u]response cmd connect failed, close socket", ctx->s->id);
 				return;
 			}
-
-			if (ctx->client_up_first_packet->len()) {
-				int flushrt = ctx->flush_packet_to_server(ctx->client_up_first_packet);
-
-				if (flushrt == wawo::OK) {
-					ctx->client_up_first_packet->reset();
-				}
-				else if(flushrt == wawo::E_SOCKET_SEND_BLOCK ){
-					WWSP<packet> outp = wawo::make_shared<packet>(*(ctx->client_up_first_packet));
-					ctx->client_outps.push(outp);
-					ctx->client_up_first_packet->reset();
-				}
-				else {}
+			
+			packet_queue outps;
+			u32_t slice_size = server_sbc.snd_size >> 1;
+			while (ctx->client_up_first_packet->len()) {
+				WWSP<packet> outp = wawo::make_shared<packet>(server_sbc.snd_size);
+				u32_t copy_c = ctx->client_up_first_packet->len() > slice_size ? slice_size : ctx->client_up_first_packet->len();
+				outp->write(ctx->client_up_first_packet->begin(), copy_c);
+				ctx->client_up_first_packet->skip(copy_c);					
+				outps.push(outp);
 			}
 
+			while (outps.size()) {
+				WWSP<wawo::packet>& outp = outps.front();
+				int flushrt = ctx->flush_packet_to_server(outp);
+				if (flushrt == wawo::OK) {
+					outps.pop();
+				}
+				else if (flushrt == wawo::E_SOCKET_SEND_BLOCK) {
+					break;
+				} else {
+					goto _skip_first_packet;
+				}			
+			}
+
+			while (outps.size()) {
+				WWSP<wawo::packet>& outp = outps.front();
+				ctx->client_outps.push(outp);
+				outps.pop();
+			}
+
+_skip_first_packet:
 			if (ctx->sflag&forward_ctx::F_CLIENT_FIN) {
 				so->shutdown(SHUTDOWN_WR);
 			}
