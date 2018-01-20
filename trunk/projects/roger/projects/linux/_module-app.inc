@@ -72,7 +72,7 @@ $(CLIENT_TARGET): $(APP_ALL_O_FILES_CLIENT)
 	@echo "---"
 	@echo \*\* assembling $(CLIENT_TARGET)...
 	@echo $(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS)
-	@$(CXX) -s $^ -o $@ $(LINK_LIBS)
+	@$(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS)
 	
 	@cp -f $(APP_PROXY_PAC_PATH) $(APP_BUILD_TARGET_PATH)
 	@echo "---"
