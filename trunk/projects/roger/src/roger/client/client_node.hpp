@@ -619,7 +619,7 @@ The document has moved\
 							//message_queue().swap(http_ctx->reqs);
 
 							message_queue empty_q;
-							wawo::swap( empty_q, http_ctx->reqs ) ;
+							std::swap( empty_q, http_ctx->reqs ) ;
 
 
 							//WAWO_ASSERT(http_ctx->state != HTTP_PARSE);
