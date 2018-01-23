@@ -65,7 +65,7 @@ namespace roger {
 		return file.len;
 	}
 
-	inline int flush_packet_for_http_conn_ctx(WWRP<http_conn_ctx> const& http_conn_ctx_, WWSP<packet> const& packet) {
+	inline int flush_packet_for_http_conn_ctx(WWRP<http_conn_ctx> const& http_conn_ctx_, WWSP<packet> const& packet ) {
 		if (http_conn_ctx_->req_up_packets.size()) {
 			http_conn_ctx_->req_up_packets.push(packet);
 			return wawo::OK;
@@ -373,8 +373,8 @@ namespace roger {
 
 						while ( http_ctx->req_up_packets.size() ) {
 							WWSP<packet>& outp = http_ctx->req_up_packets.front();
-							int flushrt = flush_packet_for_http_conn_ctx(http_ctx, outp );
-							if (flushrt != wawo::OK) {
+							int sndrt = http_ctx->s->write(outp);
+							if (sndrt != wawo::OK ) {
 								break;
 							}
 							http_ctx->req_up_packets.pop();
