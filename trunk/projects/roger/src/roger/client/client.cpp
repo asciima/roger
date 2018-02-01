@@ -1,5 +1,5 @@
 #ifdef _DEBUG
-	#define VLD_DEBUG_ON 1
+	#define VLD_DEBUG_ON 0
 #endif
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
@@ -19,16 +19,8 @@
 
 int main(int argc, char** argv) {
 
-
-//	std::map<int, int> map_ii;
-//	map_ii.insert({ 1,1 });
-//	map_ii.insert({ 1,2 });
-
-
-//	int a = 5;
-//	int b = 3;
-//	WAWO_ASSERT(a < b, "a=%d, b=%d", a, b);
-
+	//test for coredump
+	//WAWO_ASSERT(false);
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
 	_Test_VLD();
