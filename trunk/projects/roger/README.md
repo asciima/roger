@@ -1,12 +1,5 @@
 # roger
 
-protocol feature
-          
-          1, m:n , m tcp connections map n streams
-          2, multiplexing on stream level
-          3, reliable packet transfer
-          4, ARQ retransmission for the delayed packet
- 
 build 
 
           for windows  
@@ -32,14 +25,14 @@ build
 usage
 
           1, start server
-          	./roger_server > /dev/null &
+          	./roger_server 0.0.0.0 12120 > /dev/null &
           
           2, start client
-          	roger_client roger_server_ip roger_server_listen_port
+          	roger_client roger_server_ip 12120
           
           3, setup proxy on browser side   
-          	http proxy address: http://roger_client_ip:8088/proxy.pac   
-          	socks5 proxy address: roger_client_ip 12122  
+          	pac address: http://roger_client_ip:8088/proxy.pac   
+          	socks5,socks4,http,https: roger_client_ip 12122  
 
 discussion group: QQ(452583496)
 
