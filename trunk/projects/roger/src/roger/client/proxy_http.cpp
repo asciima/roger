@@ -342,6 +342,11 @@ namespace roger { namespace http {
 				WAWO_ASSERT(pctx->cur_req != NULL);
 				WAWO_ASSERT(pctx->cur_http_ctx != NULL);
 
+				WWRP<http_conn_ctx> http_ctx = pctx->cur_http_ctx;
+
+				//@TODO,,,
+				WAWO_ASSERT(http_ctx->in_chunk_body == false);
+
 				if (pctx->cur_req->is_header_contain_connection_close == true) {
 					pctx->cur_http_ctx->s->close_write();
 				}
@@ -353,14 +358,24 @@ namespace roger { namespace http {
 		}
 
 		int on_chunk_header(WWRP<parser> const& p) {
+			//@todo, post chunk
 			(void)p;
-			WAWO_ASSERT(!"WHAT");
+			WAWO_ASSERT(p != NULL);
+			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
+			WWRP<http_conn_ctx> http_ctx = pctx->cur_http_ctx;
+
+			http_ctx->in_chunk_body = true;
 			return wawo::OK;
 		}
 
 		int on_chunk_complete(WWRP<parser> const& p) {
 			(void)p;
-			WAWO_ASSERT(!"WHAT");
+			WAWO_ASSERT(p != NULL);
+			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
+			WWRP<http_conn_ctx> http_ctx = pctx->cur_http_ctx;
+
+			WAWO_ASSERT( http_ctx->in_chunk_body == true );
+			//http_ctx->in_chunk_body = true;
 			return wawo::OK;
 		}
 	}
@@ -595,7 +610,6 @@ namespace roger { namespace http {
 			TRACE_HTTP_PROXY("[roger][http][s%u]resp message complete", http_ctx->s->id);
 
 			if (!http_ctx->in_chunk_body) {
-				WAWO_ASSERT(http_ctx->in_chunk_body == false);
 				return wawo::OK;
 			}
 			http_ctx->in_chunk_body = false;
