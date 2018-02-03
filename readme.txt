@@ -1,6 +1,6 @@
 ﻿
 
-git clone git@github.com:ycopy/roger.git
+git clone https://github.com/ycopy/roger.git
 cd roger
 git submodule init
 git submodule update --remote
