@@ -521,8 +521,6 @@ _skip_first_packet:
 			ctx->sflag |= (forward_ctx::F_CLIENT_FIN | forward_ctx::F_SERVER_FIN);
 			ctx->state = STREAM_CLOSED;
 			
-			//WAWO_ASSERT(ctx->sp_to_stream_packets.size() == 0); for pipe error, assert would be failed
-
 			if (ctx->server_peer != NULL) {
 				ctx->server_peer->close(wawo::E_SOCKET_FORCE_CLOSE);
 			}
@@ -536,7 +534,7 @@ _skip_first_packet:
 
 			WAWO_ASSERT(s != NULL);
 			WAWO_ASSERT(ctx != NULL);
-			WAWO_ASSERT(s == ctx->s);
+			WAWO_ASSERT(s == ctx->s, "s: %u, ctx->s: %u, s->flag: %u", s, ctx->s, s->flag );
 
 			wawo::thread::lock_guard<spin_mutex> lg_ctx(ctx->mutex);
 			ctx->sflag |= forward_ctx::F_CLIENT_FIN;
