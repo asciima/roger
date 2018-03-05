@@ -30,7 +30,9 @@ endif
 
 ifeq ($(PRJ_ARCH),x86_64)
 	CC_MISC := $(CC_MISC) -m64
-else
+endif
+
+if eq( $(PRJ_ARCH),i386 )
 	CC_MISC := $(CC_MISC) -m32
 endif
 
