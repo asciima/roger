@@ -153,6 +153,8 @@ namespace roger { namespace http {
 				_ctx->state = PIPE_PREPARE;
 				_ctx->cp = pctx->client_peer;
 				_ctx->resp_count = 0;
+				_ctx->in_chunk_body = false;
+
 				if ( !wawo::net::is_ipv4_in_dotted_decimal_notation(pctx->dst_domain.cstr)) {
 					_ctx->domain = pctx->dst_domain.cstr;
 					_ctx->address_type = HOST;
@@ -209,6 +211,7 @@ namespace roger { namespace http {
 					http_ctx->resp_count = 0;
 					http_ctx->resp_rb->reset();
 					http_ctx->state = PIPE_PREPARE;
+					http_ctx->in_chunk_body = false;
 				}
 			}
 
