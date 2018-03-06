@@ -10,18 +10,23 @@ build
           
           for linux  
             makefile path: projects/roger/projects/linux/makefile
-            make example: make build=debug arch=x86_64 roger_server
-            make example: make build=debug arch=x86_64 roger_client
+            make example: make build=debug arch=x86_64 udns wawo roger_server
+            make example: make build=debug arch=x86_64 udns wawo roger_client
             make example: make roger_server
             make example: make roger_client
-			make example：make roger_server_clean
-			make example: make roger_client_clean
+			make example：make udns_clean wawo_clean roger_server_clean
+			make example: make udns_clean wawo_clean roger_client_clean
             
             binary file would be in: projects/roger/projects/build/$(ARCH)
             
             codeblock project file:  
             server: projects/roger/projects/codeblocks/roger/roger.workspace
             
+		  for raspberry pi
+			make build=debug arch=armv7 udns wawo roger_client 
+			make build=release arch=armv7 roger_client
+			make build=debug arch=armv7 udns_clean wawo_clean
+			
 usage
 
           1, start server
