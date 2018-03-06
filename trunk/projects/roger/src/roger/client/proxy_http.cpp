@@ -6,6 +6,34 @@
 
 namespace roger { namespace http {
 
+	inline int int_to_hex_string(int n, char* const hex_string, wawo::u32_t len) {
+		char* start = hex_string;
+
+		static char _HEX_CHAR_[] = {
+			'0','1','2','3',
+			'4','5','6','7',
+			'8','9','A','B',
+			'C','D','E','F'
+		};
+
+		std::stack<char> char_stack;
+
+		while (n != 0) {
+			wawo::u32_t mode_v = n % 16;
+			char_stack.push(_HEX_CHAR_[mode_v]);
+			n /= 16;
+		}
+
+		int i = 0;
+		while (char_stack.size()) {
+			WAWO_ASSERT(i < len);
+			*(start + i++) = char_stack.top();
+			char_stack.pop();
+		}
+
+		return i;
+	}
+
 	inline WWRP<parser> make_and_init_resp_parser() {
 		WWRP<parser> _p = wawo::make_ref<wawo::net::protocol::http::parser>();
 		_p->init(PARSER_RESP);
@@ -315,10 +343,23 @@ namespace roger { namespace http {
 			WAWO_ASSERT(pctx->cur_req != NULL);
 			WAWO_ASSERT(pctx->type == T_HTTP);
 
-			WWSP<packet> opack_body = wawo::make_shared<packet>(len);
+			WWRP<http_conn_ctx> http_ctx = pctx->cur_http_ctx;
+			WAWO_ASSERT(http_ctx != NULL);
+
+			WWSP<packet> opack_body = wawo::make_shared<packet>(len + 64); //64 for chunk
 
 			opack_body->write((byte_t*)data, len);
 			WAWO_ASSERT(pctx->cur_http_ctx != NULL);
+
+			if (http_ctx->in_chunk_body) {
+				char hex_string[16] = { 0 };
+				int i = int_to_hex_string(len, hex_string, 16);
+
+				opack_body->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
+				opack_body->write_left((byte_t*)hex_string, i);
+
+				opack_body->write((byte_t*)WAWO_HTTP_CRLF, 2);
+			}
 
 			int flushrt = flush_packet_for_http_conn_ctx(pctx->cur_http_ctx, opack_body);
 			if (flushrt == wawo::E_MUX_STREAM_WRITE_BLOCK) {
@@ -340,24 +381,36 @@ namespace roger { namespace http {
 				WAWO_ASSERT(pctx->state == HTTP_PARSE);
 				pctx->state = PIPE_PREPARE;
 				return -99999;
-			} else {
-
-				WAWO_ASSERT(pctx->cur_req != NULL);
-				WAWO_ASSERT(pctx->cur_http_ctx != NULL);
-
-				WWRP<http_conn_ctx> http_ctx = pctx->cur_http_ctx;
-
-				//@TODO,,,
-				WAWO_ASSERT(http_ctx->in_chunk_body == false);
-
-				if (pctx->cur_req->is_header_contain_connection_close == true) {
-					pctx->cur_http_ctx->s->close_write();
-				}
-
-				pctx->cur_http_ctx = NULL;
-				pctx->cur_req = NULL;
 			}
-			return wawo::OK;
+
+			WAWO_ASSERT(pctx->cur_req != NULL);
+			WAWO_ASSERT(pctx->cur_http_ctx != NULL);
+			WWRP<http_conn_ctx> http_ctx = pctx->cur_http_ctx;
+
+			int flushrt = 0;
+			if (http_ctx->in_chunk_body) {
+				http_ctx->in_chunk_body = false;
+				//forward trailing
+
+				WWSP<packet> chunk_trailing = wawo::make_shared<packet>();
+
+				static const char* chunk_body_trailing = "0\r\n\r\n";
+				chunk_trailing->write((byte_t*)chunk_body_trailing, 5);
+
+				flushrt = flush_packet_for_http_conn_ctx(pctx->cur_http_ctx, chunk_trailing);
+				if (flushrt == wawo::E_MUX_STREAM_WRITE_BLOCK) {
+					pctx->client_peer->get_socket()->end_async_read();
+				}
+			}
+
+			if (pctx->cur_req->is_header_contain_connection_close == true) {
+				pctx->cur_http_ctx->s->close_write();
+			}
+
+			pctx->cur_http_ctx = NULL;
+			pctx->cur_req = NULL;
+
+			return flushrt;
 		}
 
 		int on_chunk_header(WWRP<parser> const& p) {
@@ -525,38 +578,15 @@ namespace roger { namespace http {
 
 			WWSP<packet> resp_pack = wawo::make_shared<packet>(len);
 			
-			if (http_ctx->in_chunk_body ) {
-
-				static char _HEX_CHAR_[] = {
-					'0','1','2','3',
-					'4','5','6','7',
-					'8','9','A','B',
-					'C','D','E','F'
-				};
-
-				std::stack<char> char_stack;
-				u32_t calc_len = len;
-
-				while (calc_len != 0) {
-					wawo::u32_t mode_v = calc_len % 16;
-					char_stack.push(_HEX_CHAR_[mode_v]);
-					calc_len /= 16;
-				}
-
-				char hex_string[8] = { 0 };
-				int i = 0;
-				while (char_stack.size()) {
-					hex_string[i++] = char_stack.top();
-					char_stack.pop();
-				}
-
-				resp_pack->write((byte_t*) hex_string, i);
-				resp_pack->write( (byte_t*) WAWO_HTTP_CRLF, 2);
-			}
-
 			resp_pack->write((byte_t*)data,len);
 
 			if (http_ctx->in_chunk_body) {
+				char hex_string[16] = { 0 };
+				int i = int_to_hex_string(len, hex_string, 16);
+
+				resp_pack->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
+				resp_pack->write_left((byte_t*)hex_string, i);
+
 				resp_pack->write((byte_t*)WAWO_HTTP_CRLF, 2);
 			}
 
