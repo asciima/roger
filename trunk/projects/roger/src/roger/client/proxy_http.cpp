@@ -80,6 +80,9 @@ namespace roger { namespace http {
 			int parsert = protocol::http::parse_url(pctx->cur_req->url, pctx->cur_req->urlfields, p->opt == O_CONNECT);
 			WAWO_RETURN_V_IF_NOT_MATCH(parsert, parsert == wawo::OK);
 
+			//TODO
+			//check url:https://tools.ietf.org/html/rfc2616#page-128 to process a empty host string
+			//
 			WAWO_ASSERT(pctx->cur_req->urlfields.host.len > 0);
 			return wawo::OK;
 		}
