@@ -24,16 +24,18 @@ void _Test_VLD() {
 //	inet_ntop(AF_INET, &saddr.sin_addr, ip2, 64 );
 //}
 
+//#define TEST_RESOLVER
+
 #ifdef TEST_RESOLVER
 wawo::thread::spin_mutex querys_mutex;
-std::vector< WWRP<roger::dns_resolver::async_dns_query>> querys;
+std::vector< WWRP<roger::async_dns_query>> querys;
 
 struct resolve_cookie:
 	public wawo::ref_base
 {
 	wawo::thread::spin_mutex mutex;
 	wawo::len_cstr domain;
-	WWRP<roger::dns_resolver::async_dns_query> query;
+	WWRP<roger::async_dns_query> query;
 };
 
 void dns_resolve_success(std::vector<in_addr> const& in_addrs, WWRP<wawo::ref_base> const& cookie_) {
@@ -48,7 +50,7 @@ void dns_resolve_success(std::vector<in_addr> const& in_addrs, WWRP<wawo::ref_ba
 	});
 
 	wawo::thread::lock_guard<wawo::thread::spin_mutex> lg_querys(querys_mutex);
-	std::vector< WWRP<roger::dns_resolver::async_dns_query>>::iterator it = std::find(querys.begin(), querys.end(), cookie->query);
+	std::vector< WWRP<roger::async_dns_query>>::iterator it = std::find(querys.begin(), querys.end(), cookie->query);
 	WAWO_ASSERT(it != querys.end());
 	querys.erase(it);
 
@@ -83,6 +85,9 @@ int main(int argc, char** argv) {
 	{
 		std::vector<wawo::len_cstr> ns;
 		ns.push_back(wawo::len_cstr("192.168.2.1"));
+		ns.push_back(wawo::len_cstr("100.64.10.2"));
+		ns.push_back(wawo::len_cstr("100.64.10.3"));
+
 		WWRP<roger::dns_resolver> _resolver = wawo::make_ref<roger::dns_resolver>(ns);
 	
 		int rt = _resolver->init();
@@ -91,7 +96,7 @@ int main(int argc, char** argv) {
 		domains.push_back("www.baidu.com");
 		domains.push_back("www.163.com");
 		domains.push_back("www.sina.com.cn");
-
+		domains.push_back("54.65.109.6");
 
 		std::for_each(domains.begin(), domains.end(), [&_resolver](wawo::len_cstr const& domain) {
 			WWRP<resolve_cookie> cookie = wawo::make_ref<resolve_cookie>();

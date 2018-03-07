@@ -1374,6 +1374,23 @@ The document has moved\
 					break;
 				case PIPE_PREPARE:
 					{
+
+						if (ctx->address_type == HOST && is_ipv4_in_dotted_decimal_notation(ctx->dst_domain.cstr)) {
+							wawo::net::ipv4::Ip _ip;
+							int crt = wawo::net::convert_to_netsequence_ulongip_fromip(ctx->dst_domain.cstr, _ip);
+
+							if (crt != wawo::OK) {
+								WAWO_WARN("[client][http_proxy][#%u:%s]invalid ipaddr, close cp", evt->so->get_fd(), evt->so->get_addr_info().cstr);
+
+								ctx->state = PIPE_MAKING_FAILED;
+								goto __end_check;
+							}
+
+							ctx->address_type = IPV4;
+							ctx->dst_ipv4 = ::ntohl(_ip);
+							ctx->dst_domain = "";
+						}
+
 						int ec = wawo::OK;
 						WWRP<stream> ss = _make_stream(ctx, ec);
 
@@ -1384,8 +1401,8 @@ The document has moved\
 							if (ss != NULL) {
 								ss->close();
 							}
-							ctx->state = PIPE_MAKING_FAILED;
 
+							ctx->state = PIPE_MAKING_FAILED;
 							goto __end_check;
 						}
 
