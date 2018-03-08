@@ -34,6 +34,29 @@ namespace roger { namespace http {
 		return i;
 	}
 
+	int hex_string_to_int(char const* hex, u32_t len) {
+		int _t = 0;
+		int _i = 0;
+		int _b = 1;
+
+		while (_i < len) {
+			char tt = *(hex + ((len - 1) - _i));
+
+			if (tt >= '0' && tt <= '9') {
+				tt -= '0';
+			}
+			else if (tt >= 'A' && tt <= 'F') {
+				tt = (tt - 'A') + 10;
+			}
+			else {}
+
+			_t += (tt*_b);
+			_b *= 16;
+			_i++;
+		}
+		return _t;
+	}
+
 	inline WWRP<parser> make_and_init_resp_parser() {
 		WWRP<parser> _p = wawo::make_ref<wawo::net::protocol::http::parser>();
 		_p->init(PARSER_RESP);
