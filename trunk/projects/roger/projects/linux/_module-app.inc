@@ -102,13 +102,13 @@ $(CLIENT_BIN_OBJECTS_PATH)/%.o : $(APP_SRC_CLIENT_PATH)/%.cpp
 	@$(CXX) $(CC_MISC) $(DEFINES) $(INCLUDES) -c $< -o $@
 	
 	
-roger_server_clean:
+roger_server_clean: udns_clean wawo_clean
 	rm -rf $(SERVER_BIN_OBJECTS_PATH)/*
 	rm -rf $(SERVER_TARGET)
 
 roger_server_run:
 	$(SERVER_TARGET) 0.0.0.0 12120 wcp
 
-roger_client_clean:
+roger_client_clean: udns_clean wawo_clean
 	rm -rf $(CLIENT_BIN_OBJECTS_PATH)/*
 	rm -rf $(CLIENT_TARGET)
