@@ -83,6 +83,14 @@ namespace roger { namespace http {
 			//TODO
 			//check url:https://tools.ietf.org/html/rfc2616#page-128 to process a empty host string
 			//
+			//
+			//i
+			//
+			
+			if( pctx->cur_req->urlfields.host.len == 0 ){
+				WAWO_WARN("opt: %s, data: %s", wawo::net::protocol::http::option_name[pctx->cur_req->opt], data);
+			}	
+
 			WAWO_ASSERT(pctx->cur_req->urlfields.host.len > 0);
 			return wawo::OK;
 		}
