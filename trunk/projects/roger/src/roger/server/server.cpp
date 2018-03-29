@@ -57,29 +57,17 @@ void dns_resolve_success(std::vector<in_addr> const& in_addrs, WWRP<wawo::ref_ba
 }
 
 void dns_resolve_error(int const& code, WWRP < wawo::ref_base > const& cookie) {
-
 	WAWO_ERR("dns_resolve_error: %d", code);
 }
 #endif
 
-#include <unordered_map>
-
 int main(int argc, char** argv) {
-
-	/*
-	std::hash<std::string> string_hash;
-	std::size_t xxx = string_hash(std::string("aaaa"));
-	std::unordered_map<wawo::len_cstr, wawo::len_cstr> unordered_map_var;
-	*/
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
 	_Test_VLD();
 #endif
-#ifdef DEBUG_THREAD_POLL_COUNT
-	wawo::app App(1);
-#else
+
 	wawo::app App;
-#endif
 
 #ifdef TEST_RESOLVER
 	{
@@ -135,21 +123,28 @@ int main(int argc, char** argv) {
 		proto = wawo::len_cstr(argv[3]);
 	}
 
-	wawo::net::socket_addr listen_addr;
-	listen_addr.so_address = address;
-	listen_addr.so_family = wawo::net::F_AF_INET;
+	wawo::net::socketaddr laddr;
+	laddr.so_address = address;
+	laddr.so_family = wawo::net::F_AF_INET;
 
 	if (proto == "wcp") {
-		listen_addr.so_type = wawo::net::ST_DGRAM;
-		listen_addr.so_protocol = wawo::net::P_WCP;
+		laddr.so_type = wawo::net::T_DGRAM;
+		laddr.so_protocol = wawo::net::P_WCP;
 	}
 	else {
-		listen_addr.so_type = wawo::net::ST_STREAM;
-		listen_addr.so_protocol = wawo::net::P_TCP;
+		laddr.so_type = wawo::net::T_STREAM;
+		laddr.so_protocol = wawo::net::P_TCP;
 	}
 
+	WWRP<wawo::net::socket> so = wawo::make_ref<wawo::net::socket>(laddr.so_family, laddr.so_type, laddr.so_protocol);
+	int rt = so->open();
+	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
+
+	rt = so->bind(laddr.so_address);
+	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
+
 	WWRP<roger::roger_server> node = wawo::make_ref<roger::roger_server>();
-	int rt = node->Start(listen_addr);
+	int rt = node->Start(laddr);
 	(void)&rt;
 
 	WAWO_INFO("start rt: %d", rt );

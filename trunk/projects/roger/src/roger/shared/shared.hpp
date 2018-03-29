@@ -58,29 +58,8 @@
 
 namespace roger {
 
-	using namespace wawo::net::peer;
 	using namespace wawo::net;
 	using namespace wawo;
-
-	typedef wawo::net::peer::cargo<wawo::net::tlp::stream,0,1> client_peer_t;
-	typedef wawo::net::peer::cargo<wawo::net::tlp::stream,0,2> http_proxy_peer_t;
-
-	typedef wawo::net::peer::cargo<wawo::net::tlp::stream> server_peer_t;
-
-	typedef wawo::net::node_abstract<client_peer_t>		client_node_t;
-	typedef wawo::net::node_abstract<http_proxy_peer_t>	http_proxy_node_t;
-	typedef wawo::net::node_abstract<server_peer_t>		server_node_t;
-
-	typedef wawo::net::peer::mux_cargo<wawo::net::tlp::dh_symmetric_encrypt>		mux_peer_t;
-	typedef wawo::net::node_abstract<mux_peer_t>									mux_node_t;
-
-	typedef client_node_t::peer_event_t		cp_evt_t;
-	typedef http_proxy_node_t::peer_event_t	http_proxy_evt_t;
-	typedef server_peer_t::peer_event_t		sp_evt_t;
-	typedef mux_peer_t::peer_event_t			mux_evt_t;
-
-	typedef wawo::net::listener_abstract< typename server_peer_t::peer_event_t > sp_listener_t;
-	typedef wawo::net::listener_abstract< typename mux_peer_t::peer_event_t> mux_listener_t;
 
 	enum roger_cmd {
 		C_LOGIN,

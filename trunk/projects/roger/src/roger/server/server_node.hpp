@@ -11,9 +11,7 @@ namespace roger {
 
 	using namespace wawo;
 
-	class roger_server :
-		public server_node_t,
-		public mux_node_t
+	class roger_server
 	{
 		enum NodeState {
 			S_IDLE,
@@ -21,7 +19,7 @@ namespace roger {
 			S_EXIT
 		};
 
-		typedef std::vector< WWRP<mux_peer_t> > RepVec;
+		typedef std::vector< WWRP<wawo::net::socket_handler_context> > RepVec;
 	private:
 
 		wawo::thread::shared_mutex m_state_mutex;
