@@ -1,5 +1,5 @@
 #ifdef _DEBUG
-	#define VLD_DEBUG_ON 1
+	#define VLD_DEBUG_ON 0
 #endif
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
@@ -10,103 +10,173 @@ void _Test_VLD() {
 }
 #endif
 
-#include "server_node.hpp"
+#include <wawo.h>
+//#include "server_node.hpp"
 
+#include <iostream>
 
-//int main(int argc, char** argv) {
-	//test ntop,pton
+//typedef int(*foo_t)(int);
+//typedef std::function<int(int)> foo_tt;
 
-//	const char* ip = "192.168.2.1";
-//	sockaddr_in saddr;
-//	int rt = inet_pton(AF_INET, ip, &saddr.sin_addr);
+int fooo(int arg) {
+	WAWO_INFO("arg: %d", arg);
+	return arg;
+}
 
-//	char ip2[64];
-//	inet_ntop(AF_INET, &saddr.sin_addr, ip2, 64 );
-//}
+typedef decltype(fooo) _fooo_t;
+typedef decltype( std::bind(&fooo, std::placeholders::_1) ) fooo_t;
 
-//#define TEST_RESOLVER
-
-#ifdef TEST_RESOLVER
-wawo::thread::spin_mutex querys_mutex;
-std::vector< WWRP<roger::async_dns_query>> querys;
-
-struct resolve_cookie:
-	public wawo::ref_base
+template <class _Callable>
+struct event_handler: public wawo::ref_base
 {
-	wawo::thread::spin_mutex mutex;
-	wawo::len_cstr domain;
-	WWRP<roger::async_dns_query> query;
+	_Callable func_;
+
+	event_handler(_Callable&& _func) : func_( std::forward<_Callable>(_func) )
+	{
+		typedef typename std::decay<_Callable>::type __tt;
+		__tt* aaa = 0;
+	}
+
+	template<class... Args>
+	void call(Args&&... args) {
+		func_(std::forward<Args>(args)...);
+	}
 };
 
-void dns_resolve_success(std::vector<in_addr> const& in_addrs, WWRP<wawo::ref_base> const& cookie_) {
 
-	WWRP<resolve_cookie> cookie = wawo::static_pointer_cast<resolve_cookie>(cookie_);
-	wawo::thread::lock_guard<wawo::thread::spin_mutex> lg(cookie->mutex);
+typedef event_handler<fooo_t> real_type_2;
 
-	std::for_each(in_addrs.begin(), in_addrs.end(), [&](in_addr const& inaddr) {
-		char addr[16] = { 0 };
-		const char* addr_cstr = inet_ntop(AF_INET, &inaddr, addr, 16);
-		WAWO_ERR("dns_resolve_success, %s:%s", cookie->domain.cstr, addr_cstr);
-	});
+template <class _Callable>
+inline wawo::ref_ptr<event_handler<_Callable>> make_event_handler( _Callable _func)
+{
+	//typedef typename std::decay<fooo_t>::type ___tt;
+	//typedef typename std::decay<_Callable>::type __tt;
+	//static_assert(std::is_same<fooo_t, __tt >::value, "");
 
-	wawo::thread::lock_guard<wawo::thread::spin_mutex> lg_querys(querys_mutex);
-	std::vector< WWRP<roger::async_dns_query>>::iterator it = std::find(querys.begin(), querys.end(), cookie->query);
-	WAWO_ASSERT(it != querys.end());
-	querys.erase(it);
+	int iu;
 
+	//__tt* aaa= 0;
+	//___tt* aaaa = 0;
+
+	return wawo::make_ref<event_handler<_Callable>>(std::forward<_Callable>(_func));
 }
 
-void dns_resolve_error(int const& code, WWRP < wawo::ref_base > const& cookie) {
-	WAWO_ERR("dns_resolve_error: %d", code);
-}
-#endif
+struct event_trigger :
+	public wawo::ref_base
+{
+	typedef std::map<int, WWRP<wawo::ref_base> > event_map_t;
+	event_map_t m_evt_map;
 
-int main(int argc, char** argv) {
+public:
+	event_trigger():m_evt_map()
+	{}
+	virtual ~event_trigger()
+	{}
+
+	template<class _Fx, class... _Args>
+	void bind(int const& id, _Fx&& _func, _Args&&... _args)
+	{
+		WWRP<wawo::ref_base> handler = make_event_handler(std::bind(std::forward<_Fx>(_func), std::forward<_Args>(_args)...));
+		m_evt_map.insert({id, handler});
+	}
+
+	template<class _Lambda>
+	void bind(int const& id, _Lambda&& lambda) {
+
+	}
+
+	template<class _Callable, class... _Args>
+	void invoke(int id, _Args&&... _args) {
+		typename event_map_t::iterator it = m_evt_map.find(id);
+		if (it != m_evt_map.end()) {
+			WWRP<event_handler<_Callable>> callee = wawo::dynamic_pointer_cast<event_handler<_Callable>>(it->second);
+			WAWO_ASSERT(callee != NULL);
+			callee->call(std::forward<_Args>(_args)...);
+		}
+	}
+};
+
+class user_event_trigger :
+	public event_trigger
+{
+	typedef std::function<int(int)> foo;
+	foo _foo_var;
+
+	typedef decltype(std::bind(_foo_var, std::placeholders::_1)) foo_bind_t;
+
+public:
+	void invoke_foo(int i) {
+		event_trigger::invoke<foo_bind_t>(1,i);
+	}
+};
+
+
+class user_event_handler:
+	public wawo::ref_base
+{
+	int i;
+public:
+
+	user_event_handler(int i_) :i(i_) {}
+
+	void foo(int j) {
+		WAWO_INFO("this.i: %d, j: %d", i, j);
+	}
+};
+
+
+int main() {
+
+	WWRP<user_event_trigger> user_et = wawo::make_ref<user_event_trigger>();
+	WWRP<user_event_handler> user_eh = wawo::make_ref<user_event_handler>(1);
+
+	user_et->bind(1, &user_event_handler::foo, user_eh, std::placeholders::_1);
+	user_et->invoke_foo(10);
+
+	typedef std::function<int(int)> int_int_func_t;
+	int_int_func_t lambda = [](int a) -> int {
+		return a;
+	};
+
+	//typedef decltype(lambda) lambda_t;
+	//lambda_t* lambdat;
+
+	//typedef decltype(std::bind(&fooo, std::placeholders::_1)) ttt;
+	//ttt* _ttt =0;
+
+	//typedef decltype(std::bind(&lambda, std::placeholders::_1)) ttt_;
+	//ttt_* _ttt_ = 0;
+
+	//WWRP<wawo::ref_base> ib = make_event_handler(std::bind( &fooo, std::placeholders::_1));
+
+	//decltype(std::bind(std::declval<foo&>())) t;
+	//WWSP<real_type> _bb = wawo::static_pointer_cast<real_type>(_b);
+	//int i = _bb->call<int>(9);
+
+	//WWRP<real_type_2> _bb2 = wawo::dynamic_pointer_cast<real_type_2>(ib);
+	//WAWO_ASSERT( _bb2 != NULL );
+
+	//int i2 = _bb2->call<int>(10);
+
+	//auto x = cmd<int>(&foo, std::placeholders::_1);
+	//x->exec<int>(12);
+
+	//std::cout << x->getResult() << std::endl;
+	return 0;
+}
+
+
+
+
+int __main(int argc, char** argv) {
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
 	_Test_VLD();
 #endif
 
+
+	/*
 	wawo::app App;
-
-#ifdef TEST_RESOLVER
-	{
-		std::vector<wawo::len_cstr> ns;
-		ns.push_back(wawo::len_cstr("192.168.2.1"));
-		ns.push_back(wawo::len_cstr("100.64.10.2"));
-		ns.push_back(wawo::len_cstr("100.64.10.3"));
-
-		WWRP<roger::dns_resolver> _resolver = wawo::make_ref<roger::dns_resolver>(ns);
-	
-		int rt = _resolver->init();
-
-		std::vector<wawo::len_cstr> domains;
-		domains.push_back("www.baidu.com");
-		domains.push_back("www.163.com");
-		domains.push_back("www.sina.com.cn");
-		domains.push_back("54.65.109.6");
-
-		std::for_each(domains.begin(), domains.end(), [&_resolver](wawo::len_cstr const& domain) {
-			WWRP<resolve_cookie> cookie = wawo::make_ref<resolve_cookie>();
-
-			wawo::thread::lock_guard<wawo::thread::spin_mutex> lg(cookie->mutex);
-			cookie->domain = domain;
-			cookie->query = _resolver->async_resolve(domain.cstr, cookie, dns_resolve_success, dns_resolve_error);
-
-			wawo::thread::lock_guard<wawo::thread::spin_mutex> lg_querys(querys_mutex);
-			querys.push_back(cookie->query);
-		});
-
-		while( querys.size())
-		{	
-			wawo::this_thread::yield();
-		}
-
-		_resolver->deinit();
-		return 0;
-	}
-#endif
-
 
 	WAWO_INFO("[roger]server start...");
 	wawo::net::address address;
@@ -143,18 +213,11 @@ int main(int argc, char** argv) {
 	rt = so->bind(laddr.so_address);
 	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
 
-	WWRP<roger::roger_server> node = wawo::make_ref<roger::roger_server>();
-	int rt = node->Start(laddr);
-	(void)&rt;
 
-	WAWO_INFO("start rt: %d", rt );
-	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
-	while ( !App.should_exit()) {
-		wawo::this_thread::sleep(5);
-	}
-
-	node->Stop();
+	App.run_for();
 
 	WAWO_INFO("[roger]server exiting...");
+
+	*/
 	return 0;
 }
