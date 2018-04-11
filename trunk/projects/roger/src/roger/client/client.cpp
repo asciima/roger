@@ -17,6 +17,9 @@
 #include "../shared/shared.hpp"
 #include "client_node.hpp"
 
+#include "client_handlers.hpp"
+
+
 int main(int argc, char** argv) {
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
@@ -29,91 +32,84 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	{
-		wawo::app _app;
-		try {
-			//WAWO_ASSERT(false, "failed");
+	wawo::app _app;
 
-			wawo::net::socket_addr remote_socketaddr;
-			remote_socketaddr.so_family = wawo::net::F_AF_INET;
-			remote_socketaddr.so_address = wawo::net::address(wawo::len_cstr(argv[1]).cstr, wawo::to_u32(argv[2]) & 0xFFFF);
+	wawo::net::socketaddr raddr;
+	raddr.so_family = wawo::net::F_AF_INET;
+	raddr.so_address = wawo::net::address(wawo::len_cstr(argv[1]).cstr, wawo::to_u32(argv[2]) & 0xFFFF);
 
-			wawo::len_cstr proto = wawo::len_cstr(argv[3]);
+	wawo::len_cstr proto = wawo::len_cstr(argv[3]);
 
-			if (proto == wawo::len_cstr("wcp")) {
-				remote_socketaddr.so_type = wawo::net::ST_DGRAM;
-				remote_socketaddr.so_protocol = wawo::net::P_WCP;
-			}
-			else {
-				remote_socketaddr.so_type = wawo::net::ST_STREAM;
-				remote_socketaddr.so_protocol = wawo::net::P_TCP;
-			}
-
-			WWRP<roger::roger_client> node = wawo::make_ref<roger::roger_client>();
-			node->init_socket_addr(remote_socketaddr);
-
-			int start_rt = node->start();
-			if (start_rt != wawo::OK) {
-				WAWO_ERR("[roger]start failed, exiting, ec: %d", start_rt);
-				node->stop();
-				system("pause");
-				return start_rt;
-			}
-
-			int sp_rt = node->StartProxy();
-			if (sp_rt != wawo::OK) {
-				WAWO_ERR("[roger]start local proxy failed, exiting, ec: %d", sp_rt);
-				node->stop();
-				system("pause");
-				return sp_rt;
-			}
-
-			WWRP<roger::http_server> httpServer = wawo::make_ref<roger::http_server>();
-			int httpstartrt = httpServer->start();
-			if (httpstartrt != wawo::OK) {
-				WAWO_ERR("[roger]start httpserver failed: %d, exiting", httpstartrt);
-				node->stop();
-				httpServer->stop();
-				system("pause");
-				return httpstartrt;
-			}
-
-			wawo::net::socket_addr laddr;
-			laddr.so_family = wawo::net::F_AF_INET;
-			laddr.so_type = wawo::net::ST_STREAM;
-			laddr.so_protocol = wawo::net::P_TCP;
-			laddr.so_address = wawo::net::address("0.0.0.0", 8088);
-
-			int listenrt = httpServer->start_listen(laddr, roger::http_proxy_sbc);
-			if (listenrt != wawo::OK) {
-				WAWO_ERR("[roger]listen http server on addr: %s failed: %d, exiting", laddr.so_address.address_info().cstr, listenrt);
-				node->stop();
-				httpServer->stop();
-				system("pause");
-				return listenrt;
-			}
-
-			_app.run_for();
-
-			httpServer->stop();
-			node->stop();
-
-			WAWO_WARN("[roger]server exiting...");
-		}
-		catch (wawo::exception& e) {
-			WAWO_ERR("[main]wawo::exception: [%d]%s\n%s(%d) %s\n%s",
-				e.code, e.message, e.file, e.line, e.func, e.callstack);
-			throw;
-		}
-		catch (std::exception& e) {
-			WAWO_ERR("[main]std::exception: %s", e.what() );
-			throw;
-		}
-		catch (...) {
-			WAWO_ERR("[main]unknown err");
-			throw;
-		}
+	if (proto == wawo::len_cstr("wcp")) {
+		raddr.so_type = wawo::net::T_DGRAM;
+		raddr.so_protocol = wawo::net::P_WCP;
 	}
+	else {
+		raddr.so_type = wawo::net::T_STREAM;
+		raddr.so_protocol = wawo::net::P_TCP;
+	}
+
+	WWRP<wawo::net::socket> muxso = wawo::make_ref<wawo::net::socket>( raddr.so_family, raddr.so_type, raddr.so_protocol );
+	int rt = muxso->open();
+	WAWO_RETURN_V_IF_NOT_MATCH( rt, rt==wawo::OK );
+
+	WWRP<wawo::net::channel_handler_abstract> h_dh_symmetric = wawo::make_ref<wawo::net::handler::dh_symmetric_encrypt>();
+	muxso->pipeline()->add_last(h_dh_symmetric);
+
+	WWRP<wawo::net::channel_handler_abstract> h_muxstream = wawo::make_ref<wawo::net::handler::mux>();
+	muxso->pipeline()->add_last(h_muxstream);
+
+	rt = muxso->async_connect(raddr.so_address);
+	WAWO_ASSERT(rt == wawo::OK);
+
+	wawo::net::socketaddr laddr;
+	laddr.so_family = wawo::net::F_AF_INET;
+	laddr.so_type = wawo::net::T_STREAM;
+	laddr.so_protocol = wawo::net::P_TCP;
+	laddr.so_address = wawo::net::address("0.0.0.0", 12122);
+
+	WWRP<wawo::net::socket> proxyso = wawo::make_ref < wawo::net::socket >(laddr.so_family, laddr.so_type, laddr.so_address);
+	rt = proxyso->open();
+	WAWO_ASSERT(rt == wawo::OK);
+	if (rt != wawo::OK) {
+		WAWO_ERR("[roger]local proxy so open failed, exiting, ec: %d", rt);
+		muxso->close();
+		proxyso->close();
+		return -1;
+	}
+
+	rt = proxyso->bind( laddr.so_address );
+	if (rt != wawo::OK) {
+		WAWO_ERR("[roger]local proxy so bind failed, exiting, ec: %d", rt);
+		muxso->close();
+		proxyso->close();
+		return -1;
+	}
+
+	WWRP<wawo::net::channel_handler_abstract> h_proxylistener = wawo::make_ref<local_proxy_listener_handler>();
+	proxyso->pipeline()->add_last(h_proxylistener);
+
+	rt = proxyso->listen();
+	WAWO_ASSERT(rt == wawo::OK);
+
+	wawo::net::socketaddr laddr_8088;
+	laddr_8088.so_family = wawo::net::F_AF_INET;
+	laddr_8088.so_type = wawo::net::T_STREAM;
+	laddr_8088.so_protocol = wawo::net::P_TCP;
+	laddr_8088.so_address = wawo::net::address("0.0.0.0", 8088);
+
+	WWRP<wawo::net::socket> httpso = wawo::make_ref<wawo::net::socket>(laddr_8088.so_family, laddr.so_type, laddr.so_protocol);
+	rt = httpso->open();
+	WAWO_ASSERT(rt == wawo::OK);
+
+	rt = httpso->bind(laddr_8088.so_address);
+	WAWO_ASSERT(rt == wawo::OK);
+
+	WWRP<wawo::net::channel_handler_abstract> h_http = wawo::make_ref<http_handler>();
+	httpso->pipeline()->add_last(h_http);
+
+	rt = httpso->listen();
+	WAWO_ASSERT(rt == wawo::OK);
 
 	return 0;
 }

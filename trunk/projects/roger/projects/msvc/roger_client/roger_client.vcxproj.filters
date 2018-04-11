@@ -38,5 +38,8 @@
     <ClInclude Include="..\..\..\src\roger\shared\shared.hpp">
       <Filter>源文件\src\shared</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\roger\client\client_handlers.hpp">
+      <Filter>源文件\src\client</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -89,6 +89,7 @@
     <ClCompile Include="..\..\..\src\roger\client\proxy_http.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\roger\client\client_handlers.hpp" />
     <ClInclude Include="..\..\..\src\roger\client\client_node.hpp" />
     <ClInclude Include="..\..\..\src\roger\shared\shared.hpp" />
   </ItemGroup>
