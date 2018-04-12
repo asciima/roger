@@ -18,14 +18,3 @@ public:
 		ch->pipeline()->add_last( wawo::make_ref<local_proxy_handler>() );
 	}
 };
-
-class http_handler :
-	public wawo::net::channel_inbound_handler_abstract
-{
-
-public:
-	void read(WWRP<wawo::net::channel_handler_context> const& ctx, WWRP<wawo::net::channel> const& ch) {
-
-	}
-
-};
