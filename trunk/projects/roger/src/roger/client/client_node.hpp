@@ -42,30 +42,7 @@ namespace roger {
 
 	using namespace wawo;
 
-	inline int load_file_into_len_cstr(len_cstr& file, len_cstr const& file_path_name) {
-		FILE* fp = fopen(file_path_name.cstr , "rb");
-		if (fp == NULL) {
-			return wawo::get_last_errno();
-		}
-
-		int seekrt = fseek(fp, 0L, SEEK_END);
-		long end = ftell(fp);
-		int seekbeg = fseek(fp, 0L, SEEK_SET);
-
-		(void)seekrt;
-		(void)seekbeg;
-
-		WWSP<wawo::packet> file_bytes = wawo::make_shared<wawo::packet>(end);
-		::size_t rbytes = fread((char*)file_bytes->begin(), 1, end, fp);
-		file_bytes->forward_write_index(rbytes);
-
-		wawo::len_cstr _file((char*)file_bytes->begin(), file_bytes->len());
-		file = _file;
-		WAWO_ASSERT( (long)file.len == end);
-		return file.len;
-	}
-
-	inline int flush_packet_for_http_conn_ctx(WWRP<http_conn_ctx> const& http_conn_ctx_, WWSP<packet> const& packet ) {
+	inline int flush_packet_for_http_conn_ctx(WWRP<http_conn_ctx> const& http_conn_ctx_, WWRP<packet> const& packet ) {
 		if (http_conn_ctx_->req_up_packets.size()) {
 			http_conn_ctx_->req_up_packets.push(packet);
 			return wawo::OK;
@@ -80,100 +57,6 @@ namespace roger {
 			return sndrt;
 		}
 	}
-
-	class http_server :
-		public wawo::net::http_node {
-
-		typedef http_node::peer_t peer_t;
-		typedef http_node::peer_event_t peer_event_t;
-		typedef http_node::message_t message_t;
-
-	public:
-		void on_message(WWRP<peer_event_t> const& pevt)
-		{
-			WWSP<message_t> const& message = pevt->message;
-			WWRP<peer_t> const& peer = pevt->peer;
-			WAWO_ASSERT(message->type == wawo::net::peer::message::http::T_REQUEST);
-			WAWO_INFO("[http_server]request url: %s", message->url.cstr);
-
-			wawo::len_cstr proxy_type = wawo::len_cstr("PROXY");
-			int is_socks5_url = wawo::strpos(message->url.cstr, "socks5.pac");
-			if (is_socks5_url != -1) {
-				proxy_type = wawo::len_cstr("SOCKS5");
-			}
-
-			WWSP<wawo::net::peer::message::http> resp(new wawo::net::peer::message::http());
-			wawo::net::protocol::http::version ver = { 1,1 };
-
-			resp->version = ver;
-			resp->add_header_line("Content-Type", "application/x-ns-proxy-autoconfig");
-			resp->add_header_line("Connection", "close");
-
-			wawo::len_cstr pac_file_content;
-			int load_rt = load_file_into_len_cstr(pac_file_content, "proxy.pac");
-
-
-//#define TEST_302
-#ifdef TEST_302
-			resp->code = 302;
-			resp->status = "Found";
-			resp->body = "file moved";
-			int resprt_ = peer->respond(resp, message);
-			WAWO_INFO("[http_server]resp: %d", resprt_);
-			peer->close();
-
-			return;
-#endif
-
-			if (load_rt < 0 || pac_file_content.len == 0) {
-				resp->code = 404;
-				resp->status = "File not found";
-				resp->body = "file not found";
-			}
-			else {
-
-				wawo::len_cstr host = message->header.get("Host");
-
-				if (host.len == 0) {
-					resp->code = 403;
-					resp->status = "access forbidden";
-					resp->body = "access forbidden";
-				} else {
-
-					resp->code = 200;
-					resp->status = "OK";
-
-					std::vector<wawo::len_cstr> host_and_port;
-					wawo::split(host, ":", host_and_port);
-
-					if (host_and_port.size() != 2) {
-						WAWO_ERR("[http_server]invalid http request");
-						peer->close();
-						return;
-					}
-					WAWO_ASSERT(host_and_port.size() == 2);
-
-					wawo::len_cstr REPLACE_IP = "ROGER_HTTP_SERVER_ADDR";
-					wawo::len_cstr REPLACE_TYPE = "PROXY_TYPE";
-
-					wawo::len_cstr new_content_phase_1;
-					wawo::len_cstr new_content_phase_2;
-
-					int rep_rt1 = wawo::replace(pac_file_content, REPLACE_IP, host_and_port[0], new_content_phase_1);
-					WAWO_ASSERT(rep_rt1 >= 1);
-					int rep_rt2 = wawo::replace(new_content_phase_1, REPLACE_TYPE, proxy_type, new_content_phase_2);
-					WAWO_ASSERT(rep_rt2 == 1);
-
-					resp->body = new_content_phase_2;
-				}
-			}
-
-			int resprt = peer->respond(resp, message);
-			WAWO_INFO("[http_server]resp: %d", resprt);
-			peer->close();
-		}
-	};
-
 
 	class roger_client :
 		public client_node_t,
@@ -287,7 +170,7 @@ namespace roger {
 		}
 
 		inline int _CMD_connect_server(WWRP<stream> const& s, wawo::net::ipv4::Ip const& ip, wawo::net::ipv4::Port const& port) {
-			WWSP<wawo::packet> outp = wawo::make_shared<wawo::packet>();
+			WWRP<wawo::packet> outp = wawo::make_shared<wawo::packet>();
 
 			outp->write<u8_t>(C_CONNECT);
 			outp->write<u16_t>(port);
@@ -299,7 +182,7 @@ namespace roger {
 
 		inline int _CMD_connect_server(WWRP<stream> const& s, wawo::len_cstr const& host, wawo::net::ipv4::Port const& port) {
 
-			WWSP<wawo::packet> outp = wawo::make_shared<wawo::packet>();
+			WWRP<wawo::packet> outp = wawo::make_shared<wawo::packet>();
 
 			outp->write<u8_t>(C_CONNECT);
 			outp->write<u16_t>(port);
@@ -456,7 +339,7 @@ namespace roger {
 						WWSP<message::cargo> bp_packet = wawo::make_shared<message::cargo>(inpack);
 						int rt = pctx->client_peer->do_send_message(bp_packet);
 
-						//if (rt == wawo::E_SOCKET_SEND_BLOCK) {
+						//if (rt == wawo::E_CHANNEL_WRITE_BLOCK) {
 						//	WAWO_ASSERT(pctx->client_down_packet->len() == 0);
 						//	pctx->client_down_packet = inpack;
 						//}

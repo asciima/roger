@@ -246,7 +246,7 @@ namespace roger {
 	*/
 
 	typedef std::queue< WWSP<wawo::net::protocol::http::message> > message_queue;
-	typedef std::queue< WWSP<wawo::packet> > packet_queue;
+	typedef std::queue< WWRP<wawo::packet> > packet_queue;
 
 	struct async_dns_query;
 
@@ -267,7 +267,7 @@ namespace roger {
 		WWRP<stream> s;
 		WWRP<server_peer_t> server_peer;
 
-		WWSP<wawo::packet> client_up_first_packet; //first req packet
+		WWRP<wawo::packet> client_up_first_packet; //first req packet
 
 		packet_queue client_outps;
 
@@ -299,7 +299,7 @@ namespace roger {
 			WWSP<message::cargo> omessage = wawo::make_shared<message::cargo>(outp);
 			int flushrt = server_peer->do_send_message(omessage);
 
-			if (flushrt == wawo::E_SOCKET_SEND_BLOCK) {
+			if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
 			} else if (flushrt == wawo::OK) {
 				TRACE_SERVER_STREAM("[forward_ctx][s%u][%d:%s]forward buffer to server success: %u", s->id, server_peer->get_socket()->get_fd(), server_peer->get_socket()->get_addr_info().cstr, outp->len() );
 			} else {
@@ -367,7 +367,7 @@ namespace roger {
 
 			if (cancel_code >= 0) {
 				WAWO_ASSERT(cancel_code < http_request_cancel_code::HTTP_REQUEST_CANCEL_CODE_MAX);
-				WWSP<wawo::packet> resp_pack = wawo::make_shared<wawo::packet>(1024);
+				WWRP<wawo::packet> resp_pack = wawo::make_shared<wawo::packet>(1024);
 
 				resp_pack->write((wawo::byte_t*) HTTP_RESP_ERROR[cancel_code], wawo::strlen(HTTP_RESP_ERROR[cancel_code]));
 				WWSP<wawo::net::peer::message::cargo> mresp = wawo::make_shared<wawo::net::peer::message::cargo>(resp_pack);
@@ -403,7 +403,7 @@ namespace roger {
 
 		WWRP<client_peer_t> client_peer;
 
-		WWSP<wawo::packet> protocol_packet; //client up ringbuffer --> stream
+		WWRP<wawo::packet> protocol_packet; //client up ringbuffer --> stream
 		packet_queue client_up_packets;
 
 		WWRP<stream> s;

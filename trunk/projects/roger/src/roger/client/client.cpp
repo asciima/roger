@@ -98,17 +98,17 @@ int main(int argc, char** argv) {
 	laddr_8088.so_protocol = wawo::net::P_TCP;
 	laddr_8088.so_address = wawo::net::address("0.0.0.0", 8088);
 
-	WWRP<wawo::net::socket> httpso = wawo::make_ref<wawo::net::socket>(laddr_8088.so_family, laddr.so_type, laddr.so_protocol);
-	rt = httpso->open();
+	WWRP<wawo::net::socket> pachttpso = wawo::make_ref<wawo::net::socket>(laddr_8088.so_family, laddr.so_type, laddr.so_protocol);
+	rt = pachttpso->open();
 	WAWO_ASSERT(rt == wawo::OK);
 
-	rt = httpso->bind(laddr_8088.so_address);
+	rt = pachttpso->bind(laddr_8088.so_address);
 	WAWO_ASSERT(rt == wawo::OK);
 
-	WWRP<wawo::net::channel_handler_abstract> h_http = wawo::make_ref<http_handler>();
-	httpso->pipeline()->add_last(h_http);
+	WWRP<wawo::net::channel_handler_abstract> h_http = wawo::make_ref<pac_http_listener_handler> ();
+	pachttpso->pipeline()->add_last(h_http);
 
-	rt = httpso->listen();
+	rt = pachttpso->listen();
 	WAWO_ASSERT(rt == wawo::OK);
 
 	return 0;
