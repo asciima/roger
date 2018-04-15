@@ -18,6 +18,7 @@ public:
 		ch->pipeline()->add_last( wawo::make_ref<local_proxy_handler>() );
 	}
 };
+<<<<<<< HEAD
 
 inline int load_file_into_len_cstr(wawo::len_cstr& file, wawo::len_cstr const& file_path_name) {
 	FILE* fp = fopen(file_path_name.cstr, "rb");
@@ -147,3 +148,5 @@ public:
 		ch->pipeline()->add_last(h);
 	}
 };
+=======
+>>>>>>> 62aadb89ae17c61b8d47017af102fee1d8ee9ce9
