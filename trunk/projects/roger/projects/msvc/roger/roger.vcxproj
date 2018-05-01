@@ -96,7 +96,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\roger\server\dns_resolver.hpp" />
-    <ClInclude Include="..\..\..\src\roger\server\server_node.hpp" />
+    <ClInclude Include="..\..\..\src\roger\server\server_handlers.hpp" />
     <ClInclude Include="..\..\..\src\roger\shared\shared.hpp" />
   </ItemGroup>
   <ItemGroup>

@@ -11,6 +11,7 @@ void _Test_VLD() {
 #endif
 
 #include <wawo.h>
+#include "server_handlers.hpp"
 
 int main(int argc, char** argv) {
 
@@ -55,9 +56,13 @@ int main(int argc, char** argv) {
 	rt = so->bind(laddr.so_address);
 	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
 
-	App.run_for();
+	WWRP<roger::mux_acceptor> mux_acceptor = wawo::make_ref<roger::mux_acceptor>();
+	so->pipeline()->add_last(mux_acceptor);
 
+	rt = so->listen();
+	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
+
+	App.run_for();
 	WAWO_INFO("[roger]server exiting...");
-	
 	return 0;
 }

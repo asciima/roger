@@ -30,9 +30,6 @@
     <ClCompile Include="..\..\..\src\roger\client\proxy_http.cpp">
       <Filter>源文件\src\client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\roger\client\http_handler.cpp">
-      <Filter>源文件\src\client</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\roger\client\client_node.hpp">
@@ -42,9 +39,6 @@
       <Filter>源文件\src\shared</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\roger\client\client_handlers.hpp">
-      <Filter>源文件\src\client</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\roger\client\http_handler.hpp">
       <Filter>源文件\src\client</Filter>
     </ClInclude>
   </ItemGroup>

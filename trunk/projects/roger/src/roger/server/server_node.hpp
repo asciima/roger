@@ -7,6 +7,8 @@
 	#include "dns_resolver.hpp"
 #endif
 
+#include <wawo.h>
+
 namespace roger {
 
 	using namespace wawo;
@@ -19,7 +21,7 @@ namespace roger {
 			S_EXIT
 		};
 
-		typedef std::vector< WWRP<wawo::net::socket_handler_context> > RepVec;
+		typedef std::vector< WWRP<wawo::net::channel_handler_context> > RepVec;
 	private:
 
 		wawo::thread::shared_mutex m_state_mutex;

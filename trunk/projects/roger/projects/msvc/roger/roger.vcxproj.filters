@@ -30,11 +30,11 @@
     <ClInclude Include="..\..\..\src\roger\server\dns_resolver.hpp">
       <Filter>Source Files\src\roger\server</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\roger\server\server_node.hpp">
-      <Filter>Source Files\src\roger\server</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\roger\shared\shared.hpp">
       <Filter>Source Files\src\roger\shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\roger\server\server_handlers.hpp">
+      <Filter>Source Files\src\roger\server</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

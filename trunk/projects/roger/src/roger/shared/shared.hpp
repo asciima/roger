@@ -390,47 +390,6 @@ namespace roger {
 		STREAM_WRITE_BLOCK = 0x01
 	};
 
-	struct proxy_ctx :
-		public wawo::ref_base
-	{
-		wawo::thread::spin_mutex mutex;
-		WWRP<roger_client> rclient;
-
-		proxy_state state;
-		http_req_sub_state sub_state;
-
-		proxy_forward_type type;
-
-		WWRP<client_peer_t> client_peer;
-
-		WWRP<wawo::packet> protocol_packet; //client up ringbuffer --> stream
-		packet_queue client_up_packets;
-
-		WWRP<stream> s;
-		u8_t stream_write_flag;
-
-		roger_connect_address_type address_type;
-
-		ipv4::Ip	dst_ipv4; 
-		ipv4::Port	dst_port;
-
-		len_cstr	dst_domain;
-		address		dst_addrv4;
-
-		stream_http_conn_map	conn_map;
-
-		WWRP<wawo::net::protocol::http::parser> req_parser;
-		WWSP<wawo::net::protocol::http::message> cur_req;
-		WWRP<http_conn_ctx> cur_http_ctx;
-
-		wawo::len_cstr http_field_tmp;
-
-		//for resp
-		WWRP<http_conn_ctx> cur_resp_http_conn_ctx;
-
-		WWRP<wawo::bytes_ringbuffer> memory_tag;
-	};
-
 	//const int ENCRYPT_BUFFER_CFG = wawo::net::BT_MEDIUM_UPPER;
 	const static wawo::net::socket_buffer_cfg mux_sbc = { 256*1024,256*1024 };
 	const static wawo::net::socket_buffer_cfg http_proxy_sbc = { 256*1024,256*1024 };

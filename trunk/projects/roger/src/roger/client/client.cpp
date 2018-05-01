@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	WWRP<wawo::net::channel_handler_abstract> h_proxylistener = wawo::make_ref<local_proxy_listener_handler>();
+	WWRP<wawo::net::channel_handler_abstract> h_proxylistener = wawo::make_ref<roger::local_proxy_listener_handler>();
 	proxyso->pipeline()->add_last(h_proxylistener);
 
 	rt = proxyso->listen();
@@ -105,11 +105,13 @@ int main(int argc, char** argv) {
 	rt = pachttpso->bind(laddr_8088.so_address);
 	WAWO_ASSERT(rt == wawo::OK);
 
-	WWRP<wawo::net::channel_handler_abstract> h_http = wawo::make_ref<pac_http_listener_handler> ();
+	WWRP<wawo::net::channel_handler_abstract> h_http = wawo::make_ref<roger::pac_http_listener_handler> ();
 	pachttpso->pipeline()->add_last(h_http);
 
 	rt = pachttpso->listen();
 	WAWO_ASSERT(rt == wawo::OK);
 
+	_app.run_for();
+	WAWO_INFO("exit main ...");
 	return 0;
 }
