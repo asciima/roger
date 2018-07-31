@@ -1,7 +1,6 @@
 #ifndef _ROGER_SHARED_HPP
 #define _ROGER_SHARED_HPP
 
-
 #ifdef ROGER_SERVER
 	#define ROGER_USE_LIBUDNS
 #endif
@@ -16,8 +15,12 @@
 
 #ifdef _DEBUG
 	#define DEBUG_HTTP_PROXY
-	#define DEBUG_CLIENT_SOCKET
+	#define ENABLE_TRACE_SERVER_SIDE_CTX
+	#define ENABLE_TRACE_CLIENT_SIDE_CTX
 #endif
+
+//#define ENABLE_TRACE_SERVER_SIDE_CTX
+//#define ENABLE_TRACE_CLIENT_SIDE_CTX
 
 #ifdef DEBUG_HTTP_PROXY
 	#define TRACE_HTTP_PROXY WAWO_INFO
@@ -25,28 +28,16 @@
 	#define TRACE_HTTP_PROXY(...)
 #endif
 
-#ifdef DEBUG_CLIENT_SOCKET
-	#define TRACE_CLIENT_SOCKET WAWO_INFO
+#ifdef ENABLE_TRACE_CLIENT_SIDE_CTX
+	#define TRACE_CLIENT_SIDE_CTX WAWO_INFO
 #else
-	#define TRACE_CLIENT_SOCKET(...)
+	#define TRACE_CLIENT_SIDE_CTX(...)
 #endif
 
-#ifdef DEBUG
-	#define ENABLE_TRACE_CTX
-	#define ENABLE_TRACE_SERVER_STREAM
-	#define ENABLE_TRACE_DNS_RESOLVE
-#endif
-
-#ifdef ENABLE_TRACE_CTX
-	#define TRACE_CTX WAWO_INFO
+#ifdef ENABLE_TRACE_SERVER_SIDE_CTX
+	#define TRACE_SERVER_SIDE_CTX WAWO_INFO
 #else
-	#define TRACE_CTX(...)
-#endif
-
-#ifdef ENABLE_TRACE_SERVER_STREAM
-	#define TRACE_SERVER_STREAM WAWO_INFO
-#else
-	#define TRACE_SERVER_STREAM(...)
+	#define TRACE_SERVER_SIDE_CTX(...)
 #endif
 
 #ifdef ENABLE_TRACE_DNS_RESOLVE
@@ -95,15 +86,15 @@ namespace roger {
 	};
 
 	enum socks5_address_type {
-		ADDR_IPV4	= 0x01,
+		ADDR_IPV4 = 0x01,
 		ADDR_DOMAIN = 0x03,
-		ADDR_IPV6	= 0x04
+		ADDR_IPV6 = 0x04
 	};
 
 	enum socks5_cmd {
-		S5C_CONNECT			= 0x01,
-		S5C_BIND			= 0x02,
-		S5C_UDP_ASSOCIATE	= 0x03
+		S5C_CONNECT = 0x01,
+		S5C_BIND = 0x02,
+		S5C_UDP_ASSOCIATE = 0x03
 	};
 
 	enum socks5_response_code {
@@ -139,31 +130,25 @@ namespace roger {
 		WAIT_FIRST_PACK,
 
 		SOCKS5_CHECK_AUTH,
+		SOCKS5_RESP_HANDSHAKE,
 		SOCKS5_CHECK_CMD,
 
 		SOCKS4_PARSE,
-
 		HTTP_PARSE,
 
 		PIPE_PREPARE,
-		PIPE_MAKING,
-		PIPE_CONNECTED,
-		PIPE_CONNECT_HOST_FAILED,
-		PIPE_MAKING_FAILED,
-		PIPE_BROKEN,
+		
+		PIPE_DIALING_STREAM,
+		PIPE_DIAL_STREAM_OK,
+		PIPE_DIAL_STREAM_FAILED,
 
-		CLIENT_CLOSED,
-		PROXY_ERROR,
+		PIPE_DIALING_SERVER,
+		PIPE_DIAL_SERVER_OK,
+		PIPE_DIAL_SERVER_FAILED,
+
 		HTTP_PARSE_ERROR,
 
 		PS_MAX
-	};
-
-	enum http_req_sub_state {
-		S_IDLE,
-		S_ON_MESSAGE_BEGIN,
-		S_ON_HEADERS_COMPLETE,
-		S_ON_MESSAGE_COMPLETE
 	};
 
 	static const char* proxy_state_str[PS_MAX] = {
@@ -181,27 +166,32 @@ namespace roger {
 		"http_parse",
 
 		"pipe_prepare",
-		"pipe_making",
-		"pipe_connected",
-		"pipe_connect_host_failed",
-		"pipe_making_failed",
-		"pipe_broken",
+		"pipe_dialing_stream",
+		"pipe_dial_stream_ok",
+		"pipe_dial_stream_failed",
 
-		"client_closed",
-		"proxy_error",
+		"pipe_dialing_server",
+		"pipe_dial_server_ok"
+		"pipe_dial_server_failed",
+
 		"http_parse_error"
 	};
 
-
+	enum http_req_sub_state {
+		S_IDLE,
+		S_ON_MESSAGE_BEGIN,
+		S_ON_HEADERS_COMPLETE,
+		S_ON_MESSAGE_COMPLETE
+	};
 	enum server_state {
 		CONNECT,
 		READ_DST_ADDR,
 		LOOKUP_SERVER_NAME,
-		CONNECTING_SERVER,
+		LOOKUP_SERVER_NAEM_FAILED,
+		DIAL_SERVER,
+		DIAL_SERVER_FAILED,
+		DIAL_SERVER_OK,
 		SERVER_CONNECTED,
-		SERVER_CLOSED,
-		STREAM_CLOSED,
-		ERR,
 		SS_MAX
 	};
 
@@ -209,10 +199,17 @@ namespace roger {
 		"wait_connect",
 		"read_dst_addr",
 		"lookup_server_name",
-		"connecting_server",
-		"server_connected",
-		"server_closed",
-		"err"
+		"lookup_server_name_failed",
+		"dial_server",
+		"dial_server_failed",
+		"dial_server_ok",
+		"server_connected"
+	};
+
+	enum server_error_code {
+		E_UNKNOWN_CMD = -40001,
+		E_INVALID_DOMAIN = -40002,
+		E_DNSLOOKUP_RETURN_NO_IP = -40003,
 	};
 
 	static const char HTTP_RESP_RELAY_SUCCEED[] =
@@ -249,104 +246,66 @@ namespace roger {
 	typedef std::queue< WWRP<wawo::packet> > packet_queue;
 
 	struct async_dns_query;
-
 	class roger_client;
+
+	enum ctx_write_state {
+		WS_IDLE,
+		WS_WRITING
+	};
 
 	struct forward_ctx :
 		public wawo::ref_base
 	{
+		forward_ctx() {
+			TRACE_SERVER_SIDE_CTX("forward_ctx::forward_ctx()");
+		}
+		~forward_ctx() {
+			TRACE_SERVER_SIDE_CTX("forward_ctx::~forward_ctx()");
+		}
+		/*
 		enum session_flag {
 			F_NONE = 0,
-			F_CLIENT_FIN = 1,
+			F_STREAM_FIN = 1,
 			F_SERVER_FIN = 1 << 1,
-			F_BOTH_FIN = (F_CLIENT_FIN | F_SERVER_FIN),
+			F_BOTH_FIN = (F_STREAM_FIN | F_SERVER_FIN),
 		};
-
-		wawo::thread::spin_mutex mutex;
-		wawo::net::peer::stream_id_t stream_id;
-		WWRP<stream> s;
-		WWRP<server_peer_t> server_peer;
+		*/
+		WWRP<wawo::net::channel_handler_context> ch_stream_ctx;
+		WWRP<wawo::net::channel_handler_context> ch_server_ctx;
 
 		WWRP<wawo::packet> client_up_first_packet; //first req packet
+		packet_queue up_to_server_packets;
+		packet_queue down_to_stream_packets;
 
-		packet_queue client_outps;
-
-		packet_queue sp_to_stream_packets;
 		server_state state;
-
+		ctx_write_state up_state;
+		ctx_write_state down_state;
+		bool stream_read_closed;
+		bool server_read_closed;
 		roger_connect_address_type address_type;
 
-		ipv4::Ip dst_ipv4;
-		ipv4::Port dst_port;
+		ipv4_t dst_ipv4;
+		port_t dst_port;
 
-		len_cstr	dst_domain;
+		std::string dst_domain;
 		address		dst_addrv4;
 
-		int sflag;
+//		int sflag;
+
 
 #ifdef ROGER_USE_LIBUDNS
 		WWRP<async_dns_query> query;
 #endif
 
+		u64_t ts_dns_lookup_start;
+		u64_t ts_dns_lookup_done;
+		u64_t ts_server_connect_start;
+		u64_t ts_server_connect_done;
+
 		WWRP<wawo::bytes_ringbuffer> memory_tag;
-		forward_ctx() {}
-		~forward_ctx() {}
-
-		int flush_packet_to_server( WWSP<packet> const& outp ) {
-
-			WAWO_ASSERT( server_peer != NULL);
-
-			WWSP<message::cargo> omessage = wawo::make_shared<message::cargo>(outp);
-			int flushrt = server_peer->do_send_message(omessage);
-
-			if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
-			} else if (flushrt == wawo::OK) {
-				TRACE_SERVER_STREAM("[forward_ctx][s%u][%d:%s]forward buffer to server success: %u", s->id, server_peer->get_socket()->get_fd(), server_peer->get_socket()->get_addr_info().cstr, outp->len() );
-			} else {
-				TRACE_SERVER_STREAM("[forward_ctx][s%u][%d:%s]forward buffer to server failed: %d, close sp", s->id, server_peer->get_socket()->get_fd(), server_peer->get_socket()->get_addr_info().cstr, flushrt );
-				server_peer->close(flushrt);
-			}
-
-			return flushrt;
-		}
 	};
 
 	enum http_conn_state {};
-
-	struct http_conn_ctx:
-		public wawo::ref_base
-	{
-		spin_mutex mutex;
-
-		roger_connect_address_type address_type;
-		wawo::len_cstr host_with_port;
-
-		wawo::len_cstr domain;
-		ipv4::Ip ip;
-
-		ipv4::Port port;
-		proxy_state state;
-
-		bool in_chunk_body;
-		bool resp_header_connection_close;
-
-		u32_t resp_count;
-
-		WWRP<wawo::net::protocol::http::parser> http_resp_parser;
-		WWSP<wawo::net::protocol::http::message> cur_req;
-
-		packet_queue req_up_packets;
-		
-		message_queue reqs;
-
-		WWRP<wawo::bytes_ringbuffer> resp_rb;
-		WWSP<wawo::net::protocol::http::message> cur_resp;
-
-		wawo::len_cstr resp_http_field_tmp;
-
-		WWRP<client_peer_t> cp;
-		WWRP<stream> s;
-	};
 
 	enum http_request_cancel_code {
 		CANCEL_CODE_SERVER_NO_RESPONSE = 0,
@@ -362,45 +321,19 @@ namespace roger {
 		HTTP_RESP_CONNECT_HOST_FAILED
 	};
 
-	inline void cancel_all_ctx_reqs(WWRP<http_conn_ctx> const& ctx, int const& cancel_code ) {
-		while (ctx->reqs.size()) {
-
-			if (cancel_code >= 0) {
-				WAWO_ASSERT(cancel_code < http_request_cancel_code::HTTP_REQUEST_CANCEL_CODE_MAX);
-				WWRP<wawo::packet> resp_pack = wawo::make_shared<wawo::packet>(1024);
-
-				resp_pack->write((wawo::byte_t*) HTTP_RESP_ERROR[cancel_code], wawo::strlen(HTTP_RESP_ERROR[cancel_code]));
-				WWSP<wawo::net::peer::message::cargo> mresp = wawo::make_shared<wawo::net::peer::message::cargo>(resp_pack);
-
-				WAWO_ASSERT(ctx->cp != NULL);
-				ctx->cp->do_send_message(mresp);
-			}
-
-			WWSP<wawo::net::protocol::http::message>& req = ctx->reqs.front();
-			WAWO_INFO("[roger][http][s%u]cancel req: %s, cancel code: %u", ctx->s->id, req->url.cstr, cancel_code );
-			ctx->reqs.pop();
-		}
-	}
-
-	typedef std::unordered_map < wawo::len_cstr, WWRP<http_conn_ctx> > stream_http_conn_map;
-	typedef std::pair < wawo::len_cstr, WWRP<http_conn_ctx>> stream_http_conn_pair;
-
-
 	enum e_stream_write_flag {
 		STREAM_WRITE_BLOCK = 0x01
 	};
 
-	//const int ENCRYPT_BUFFER_CFG = wawo::net::BT_MEDIUM_UPPER;
-	const static wawo::net::socket_buffer_cfg mux_sbc = { 256*1024,256*1024 };
-	const static wawo::net::socket_buffer_cfg http_proxy_sbc = { 256*1024,256*1024 };
-	const static wawo::net::socket_buffer_cfg client_sbc = { 256*1024,256*1024 };
-	const static wawo::net::socket_buffer_cfg server_sbc = { 256*1024,256*1024 };
+	const static wawo::net::socket_cfg mux_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 128 * 1024,128 * 1024 }, default_keep_alive_vals);
+	const static wawo::net::socket_cfg client_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 64 * 1024,64 * 1024 }, default_keep_alive_vals);
+	const static wawo::net::socket_cfg server_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 64 * 1024,64 * 1024 }, default_keep_alive_vals);
 
+	const static wawo::net::socket_cfg http_server_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 256 * 1024,256 * 1024 }, default_keep_alive_vals);
+
+	const static wawo::net::socket_buffer_cfg mux_stream_sbc = { 256 * 1024,256 * 1024 };
 
 	const static wawo::u32_t http_resp_rb_size = (256*1024);
 	const static wawo::u32_t client_req_buffer_size = (256*1024+5);
 }
-
-
-
 #endif

@@ -12,6 +12,7 @@ void _Test_VLD() {
 
 #include <wawo.h>
 #include "server_handlers.hpp"
+#include "dns_resolver.hpp"
 
 int main(int argc, char** argv) {
 
@@ -21,48 +22,52 @@ int main(int argc, char** argv) {
 	
 	wawo::app App;
 
+	std::vector<wawo::len_cstr> ns;
+#if WAWO_ISWIN
+//	ns.push_back("192.168.0.1");
+//	ns.push_back("192.168.1.1");
+//	ns.push_back("192.168.2.1");
+	ns.push_back("100.64.10.2");
+	ns.push_back("100.64.10.3");
+#endif
+
+	int resolver_init = roger::dns_resolver::instance()->init(ns);
+	WAWO_RETURN_V_IF_NOT_MATCH(resolver_init, resolver_init == wawo::OK);
+
 	WAWO_INFO("[roger]server start...");
 	wawo::net::address address;
-	wawo::len_cstr proto = wawo::len_cstr("tcp");
+	std::string proto = std::string("tcp");
+	std::string listenurl = "tcp://0.0.0.0:13726";
 
-	if (argc != 4) {
-		WAWO_WARN("[roger] listen address not specified, we'll use 0.0.0.0:12120 tcp");
-		address = wawo::net::address("0.0.0.0", 12120);
-	}
-	else {
-		wawo::len_cstr ip(argv[1]);
+	if (argc == 4) {
+		std::string ip(argv[1]);
 		wawo::u16_t port = wawo::to_u32(argv[2]) & 0xFFFF;
-		address = wawo::net::address(ip.cstr, port);
-		proto = wawo::len_cstr(argv[3]);
+		proto = std::string(argv[3]);
+		listenurl = proto + "://" + ip + ":" +std::to_string(port);
 	}
 
-	wawo::net::socketaddr laddr;
-	laddr.so_address = address;
-	laddr.so_family = wawo::net::F_AF_INET;
+	WWRP<wawo::net::channel_future> lch = wawo::net::socket::listen_on(listenurl, [](WWRP<wawo::net::channel> const& ch ) {
+		WWRP<wawo::net::channel_handler_abstract> h_hlen = wawo::make_ref<wawo::net::handler::hlen>();
+		ch->pipeline()->add_last(h_hlen);
+		
+		WWRP<wawo::net::channel_handler_abstract> h_dh_symmetric = wawo::make_ref<wawo::net::handler::dh_symmetric_encrypt>();
+		ch->pipeline()->add_last(h_dh_symmetric);
 
-	if (proto == "wcp") {
-		laddr.so_type = wawo::net::T_DGRAM;
-		laddr.so_protocol = wawo::net::P_WCP;
+		WWRP<wawo::net::handler::mux> h_mux = wawo::make_ref<wawo::net::handler::mux>();
+		h_mux->bind<wawo::net::handler::fn_mux_stream_accepted_t>(wawo::net::handler::E_MUX_CH_STREAM_ACCEPTED, &roger::stream_accepted, std::placeholders::_1);
+		
+		ch->pipeline()->add_last(h_mux);
+		
+	}, roger::mux_cfg );
+
+	if (lch->get() != wawo::OK) {
+		WAWO_INFO("[roger]server listen failed: %d", lch->get() );
+		return lch->get();
 	}
-	else {
-		laddr.so_type = wawo::net::T_STREAM;
-		laddr.so_protocol = wawo::net::P_TCP;
-	}
 
-	WWRP<wawo::net::socket> so = wawo::make_ref<wawo::net::socket>(laddr.so_family, laddr.so_type, laddr.so_protocol);
-	int rt = so->open();
-	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
-
-	rt = so->bind(laddr.so_address);
-	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
-
-	WWRP<roger::mux_acceptor> mux_acceptor = wawo::make_ref<roger::mux_acceptor>();
-	so->pipeline()->add_last(mux_acceptor);
-
-	rt = so->listen();
-	WAWO_RETURN_V_IF_NOT_MATCH(rt, rt == wawo::OK);
-
-	App.run_for();
+	App.run();
+	
+	roger::dns_resolver::instance()->deinit();
 	WAWO_INFO("[roger]server exiting...");
 	return 0;
 }

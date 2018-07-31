@@ -15,10 +15,7 @@
 #endif
 
 #include "../shared/shared.hpp"
-#include "client_node.hpp"
-
 #include "client_handlers.hpp"
-
 
 int main(int argc, char** argv) {
 
@@ -32,86 +29,64 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
+//	int a = 3;
+//	WAWO_ASSERT(a < 1);
+
 	wawo::app _app;
 
-	wawo::net::socketaddr raddr;
-	raddr.so_family = wawo::net::F_AF_INET;
-	raddr.so_address = wawo::net::address(wawo::len_cstr(argv[1]).cstr, wawo::to_u32(argv[2]) & 0xFFFF);
+	std::string ip(argv[1]);
+	wawo::u16_t port = wawo::to_u32(argv[2]) & 0xFFFF;
+	std::string proto = std::string(argv[3]);
+	std::string dialurl = proto + "://" + ip + ":" + std::to_string(port);
+//	std::string dialurl = "tcp://127.0.0.1:8082";
+	roger::mux_pool::instance()->init(dialurl);
+	
+	
+connect_mux:
+	WWRP < wawo::net::channel_future> dial_f = wawo::net::socket::dial(dialurl, [](WWRP<wawo::net::channel> const& ch) {
 
-	wawo::len_cstr proto = wawo::len_cstr(argv[3]);
+		WWRP<wawo::net::channel_handler_abstract> h_outlen = wawo::make_ref<wawo::net::handler::dump_out_len>();
+		ch->pipeline()->add_last(h_outlen);
 
-	if (proto == wawo::len_cstr("wcp")) {
-		raddr.so_type = wawo::net::T_DGRAM;
-		raddr.so_protocol = wawo::net::P_WCP;
+		WWRP<wawo::net::channel_handler_abstract> h_inlen = wawo::make_ref<wawo::net::handler::dump_in_len>();
+		ch->pipeline()->add_last(h_inlen);
+
+		WWRP<wawo::net::channel_handler_abstract> h_hlen = wawo::make_ref<wawo::net::handler::hlen>();
+		ch->pipeline()->add_last(h_hlen);
+
+		WWRP<wawo::net::channel_handler_abstract> h_dh_symmetric = wawo::make_ref<wawo::net::handler::dh_symmetric_encrypt>();
+		ch->pipeline()->add_last(h_dh_symmetric);
+
+		WWRP<wawo::net::handler::mux> h_mux = wawo::make_ref<wawo::net::handler::mux>();
+		h_mux->bind<wawo::net::handler::fn_mux_evt_t>(wawo::net::handler::E_MUX_CH_CONNECTED, &roger::mux_pool::connected, roger::mux_pool::instance(), std::placeholders::_1);
+		
+		ch->pipeline()->add_last(h_mux);
+	}, roger::mux_cfg );
+
+	if (dial_f->get() != wawo::OK) {
+		wawo::this_thread::sleep(1000);
+		goto connect_mux;
 	}
-	else {
-		raddr.so_type = wawo::net::T_STREAM;
-		raddr.so_protocol = wawo::net::P_TCP;
-	}
+	
 
-	WWRP<wawo::net::socket> muxso = wawo::make_ref<wawo::net::socket>( raddr.so_family, raddr.so_type, raddr.so_protocol );
-	int rt = muxso->open();
-	WAWO_RETURN_V_IF_NOT_MATCH( rt, rt==wawo::OK );
+	std::string listenurl = "tcp://0.0.0.0:12122";
+	WWRP<wawo::net::channel_future> listen_f = wawo::net::socket::listen_on(listenurl, [](WWRP<wawo::net::channel> const& ch) {
+		ch->pipeline()->add_last(wawo::make_ref<roger::local_proxy_handler>());
+	}, roger::client_cfg );
+	WAWO_ASSERT(listen_f->get() == wawo::OK);
 
-	WWRP<wawo::net::channel_handler_abstract> h_dh_symmetric = wawo::make_ref<wawo::net::handler::dh_symmetric_encrypt>();
-	muxso->pipeline()->add_last(h_dh_symmetric);
+	std::string http_listenurl = "tcp://0.0.0.0:8088";
+	WWRP<wawo::net::channel_future> http_listen_f = wawo::net::socket::listen_on(http_listenurl, [](WWRP<wawo::net::channel> const& ch) {
+		WWRP<roger::http_server_handler> https = wawo::make_ref<roger::http_server_handler>();
+		WWRP<wawo::net::handler::http> h = wawo::make_ref<wawo::net::handler::http>();
+		h->bind<wawo::net::handler::fn_http_message_header_end_t>(wawo::net::handler::http_event::E_HEADER_COMPLETE, &roger::http_server_handler::on_request, https, std::placeholders::_1, std::placeholders::_2);
+		ch->pipeline()->add_last(h);
+	}, roger::http_server_cfg);
 
-	WWRP<wawo::net::channel_handler_abstract> h_muxstream = wawo::make_ref<wawo::net::handler::mux>();
-	muxso->pipeline()->add_last(h_muxstream);
+	WAWO_INFO("service ready");
+	_app.run();
+	roger::mux_pool::instance()->deinit();
 
-	rt = muxso->async_connect(raddr.so_address);
-	WAWO_ASSERT(rt == wawo::OK);
-
-	wawo::net::socketaddr laddr;
-	laddr.so_family = wawo::net::F_AF_INET;
-	laddr.so_type = wawo::net::T_STREAM;
-	laddr.so_protocol = wawo::net::P_TCP;
-	laddr.so_address = wawo::net::address("0.0.0.0", 12122);
-
-	WWRP<wawo::net::socket> proxyso = wawo::make_ref < wawo::net::socket >(laddr.so_family, laddr.so_type, laddr.so_address);
-	rt = proxyso->open();
-	WAWO_ASSERT(rt == wawo::OK);
-	if (rt != wawo::OK) {
-		WAWO_ERR("[roger]local proxy so open failed, exiting, ec: %d", rt);
-		muxso->close();
-		proxyso->close();
-		return -1;
-	}
-
-	rt = proxyso->bind( laddr.so_address );
-	if (rt != wawo::OK) {
-		WAWO_ERR("[roger]local proxy so bind failed, exiting, ec: %d", rt);
-		muxso->close();
-		proxyso->close();
-		return -1;
-	}
-
-	WWRP<wawo::net::channel_handler_abstract> h_proxylistener = wawo::make_ref<roger::local_proxy_listener_handler>();
-	proxyso->pipeline()->add_last(h_proxylistener);
-
-	rt = proxyso->listen();
-	WAWO_ASSERT(rt == wawo::OK);
-
-	wawo::net::socketaddr laddr_8088;
-	laddr_8088.so_family = wawo::net::F_AF_INET;
-	laddr_8088.so_type = wawo::net::T_STREAM;
-	laddr_8088.so_protocol = wawo::net::P_TCP;
-	laddr_8088.so_address = wawo::net::address("0.0.0.0", 8088);
-
-	WWRP<wawo::net::socket> pachttpso = wawo::make_ref<wawo::net::socket>(laddr_8088.so_family, laddr.so_type, laddr.so_protocol);
-	rt = pachttpso->open();
-	WAWO_ASSERT(rt == wawo::OK);
-
-	rt = pachttpso->bind(laddr_8088.so_address);
-	WAWO_ASSERT(rt == wawo::OK);
-
-	WWRP<wawo::net::channel_handler_abstract> h_http = wawo::make_ref<roger::pac_http_listener_handler> ();
-	pachttpso->pipeline()->add_last(h_http);
-
-	rt = pachttpso->listen();
-	WAWO_ASSERT(rt == wawo::OK);
-
-	_app.run_for();
 	WAWO_INFO("exit main ...");
 	return 0;
 }
