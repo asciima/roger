@@ -1,0 +1,9 @@
+[submodule "trunk/libs/wawo"]
+	path = trunk/libs/wawo
+	url = https://github.com/ycopy/wawo.git
+[submodule "trunk/libs/udns"]
+	path = trunk/libs/udns
+	url = https://github.com/ycopy/udns.git
+[submodule "trunk/libs/vld"]
+	path = trunk/libs/vld
+	url = https://github.com/ycopy/vld.git

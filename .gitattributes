@@ -1,0 +1,5 @@
+*.hpp linguist-language=c++
+*.props linguist-language=c++
+*.vcxproj linguist-language=c++
+*.pac linguist-language=c++
+*.inc linguist-language=c++
