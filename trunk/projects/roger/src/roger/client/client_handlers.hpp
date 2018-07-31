@@ -776,19 +776,19 @@ namespace roger {
 
 				WWRP<wawo::net::handler::mux> mux_ = roger::mux_pool::instance()->next();
 				WAWO_ASSERT(mux_ != NULL);
-				wawo::net::handler::mux_stream_id_t sid= wawo::net::handler::mux_make_stream_id();
+				wawo::net::handler::mux_stream_id_t sid=wawo::net::handler::mux_make_stream_id();
 
 				pctx->state = PIPE_DIALING_STREAM;
-				WWRP<wawo::net::channel_future> dial_f = mux_->dial_stream(sid,[](WWRP<wawo::net::channel> const& ch) {
-					ch->ch_set_read_buffer_size(roger::mux_stream_sbc.rcv_size);
-					ch->ch_set_write_buffer_size(roger::mux_stream_sbc.snd_size);
-					WWRP<mux_stream_handler> h = wawo::make_ref<mux_stream_handler>();
-					ch->pipeline()->add_last(h);
-				});
 
+				int ec;
+				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid,ec);
+				WAWO_ASSERT(ec == wawo::OK);
+
+				WWRP<wawo::net::channel_promise> dial_f = muxs->make_promise();
 				dial_f->add_listener([pctx, sid](WWRP<wawo::net::channel_future> const& f) {
 					int rt = f->get();
 					if (rt == wawo::OK) {
+						WAWO_ASSERT(f->channel()->event_poller()->in_event_loop());
 						f->channel()->set_ctx(pctx);
 					}
 
@@ -805,6 +805,13 @@ namespace roger {
 						}
 					});
 				});
+
+				muxs->dial([](WWRP<wawo::net::channel> const& ch) {
+					ch->ch_set_read_buffer_size(roger::mux_stream_sbc.rcv_size);
+					ch->ch_set_write_buffer_size(roger::mux_stream_sbc.snd_size);
+					WWRP<mux_stream_handler> h = wawo::make_ref<mux_stream_handler>();
+					ch->pipeline()->add_last(h);
+				}, dial_f );
 			}
 			break;
 			case PIPE_DIALING_STREAM:

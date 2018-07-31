@@ -17,56 +17,59 @@
 #include "../shared/shared.hpp"
 #include "client_handlers.hpp"
 
-int main(int argc, char** argv) {
+	int main(int argc, char** argv) {
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
-	_Test_VLD();
+		_Test_VLD();
 #endif
 
-	WAWO_WARN("[roger]client start...");
-	if (argc != 4) {
-		WAWO_ERR("[roger]invalid parameter, usage: roger server_ip port");
-		return -1;
-	}
+		WAWO_WARN("[roger]client start...");
+		if (argc != 4) {
+			WAWO_ERR("[roger]invalid parameter, usage: roger server_ip port");
+			return -1;
+		}
 
-//	int a = 3;
-//	WAWO_ASSERT(a < 1);
+		//	int a = 3;
+		//	WAWO_ASSERT(a < 1);
 
-	wawo::app _app;
+		wawo::app _app;
 
-	std::string ip(argv[1]);
-	wawo::u16_t port = wawo::to_u32(argv[2]) & 0xFFFF;
-	std::string proto = std::string(argv[3]);
-	std::string dialurl = proto + "://" + ip + ":" + std::to_string(port);
-//	std::string dialurl = "tcp://127.0.0.1:8082";
-	roger::mux_pool::instance()->init(dialurl);
-	
-	
-connect_mux:
-	WWRP < wawo::net::channel_future> dial_f = wawo::net::socket::dial(dialurl, [](WWRP<wawo::net::channel> const& ch) {
+		std::string ip(argv[1]);
+		wawo::u16_t port = wawo::to_u32(argv[2]) & 0xFFFF;
+		std::string proto = std::string(argv[3]);
+		std::string dialurl = proto + "://" + ip + ":" + std::to_string(port);
+		//	std::string dialurl = "tcp://127.0.0.1:8082";
+		roger::mux_pool::instance()->init(dialurl);
 
-		WWRP<wawo::net::channel_handler_abstract> h_outlen = wawo::make_ref<wawo::net::handler::dump_out_len>();
-		ch->pipeline()->add_last(h_outlen);
+	connect_mux:
+		WWRP < wawo::net::channel_future> dial_f = wawo::net::socket::dial(dialurl, [](WWRP<wawo::net::channel> const& ch) {
 
-		WWRP<wawo::net::channel_handler_abstract> h_inlen = wawo::make_ref<wawo::net::handler::dump_in_len>();
-		ch->pipeline()->add_last(h_inlen);
+//			WWRP<wawo::net::channel_handler_abstract> h_outlen = wawo::make_ref<wawo::net::handler::dump_out_len>();
+//			ch->pipeline()->add_last(h_outlen);
 
-		WWRP<wawo::net::channel_handler_abstract> h_hlen = wawo::make_ref<wawo::net::handler::hlen>();
-		ch->pipeline()->add_last(h_hlen);
+//			WWRP<wawo::net::channel_handler_abstract> h_inlen = wawo::make_ref<wawo::net::handler::dump_in_len>();
+//			ch->pipeline()->add_last(h_inlen);
+			
+			WWRP<wawo::net::channel_handler_abstract> h_hlen = wawo::make_ref<wawo::net::handler::hlen>();
+			ch->pipeline()->add_last(h_hlen);
 
-		WWRP<wawo::net::channel_handler_abstract> h_dh_symmetric = wawo::make_ref<wawo::net::handler::dh_symmetric_encrypt>();
-		ch->pipeline()->add_last(h_dh_symmetric);
+			WWRP<wawo::net::channel_handler_abstract> h_dh_symmetric = wawo::make_ref<wawo::net::handler::dh_symmetric_encrypt>();
+			ch->pipeline()->add_last(h_dh_symmetric);
 
-		WWRP<wawo::net::handler::mux> h_mux = wawo::make_ref<wawo::net::handler::mux>();
-		h_mux->bind<wawo::net::handler::fn_mux_evt_t>(wawo::net::handler::E_MUX_CH_CONNECTED, &roger::mux_pool::connected, roger::mux_pool::instance(), std::placeholders::_1);
-		
-		ch->pipeline()->add_last(h_mux);
-	}, roger::mux_cfg );
+			WWRP<wawo::net::handler::mux> h_mux = wawo::make_ref<wawo::net::handler::mux>();
+			h_mux->bind<wawo::net::handler::fn_mux_evt_t>(wawo::net::handler::E_MUX_CH_CONNECTED, &roger::mux_pool::connected, roger::mux_pool::instance(), std::placeholders::_1);
 
-	if (dial_f->get() != wawo::OK) {
-		wawo::this_thread::sleep(1000);
-		goto connect_mux;
-	}
+			ch->pipeline()->add_last(h_mux);
+			
+		}, roger::mux_cfg);
+
+		if (dial_f->get() != wawo::OK) {
+			wawo::this_thread::sleep(1000);
+			goto connect_mux;
+		}
+
+		//dial_f->channel()->ch_close_future()->wait();
+		//return 0;
 	
 
 	std::string listenurl = "tcp://0.0.0.0:12122";
