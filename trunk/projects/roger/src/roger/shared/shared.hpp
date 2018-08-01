@@ -19,8 +19,8 @@
 	#define ENABLE_TRACE_CLIENT_SIDE_CTX
 #endif
 
-//#define ENABLE_TRACE_SERVER_SIDE_CTX
-//#define ENABLE_TRACE_CLIENT_SIDE_CTX
+#define ENABLE_TRACE_SERVER_SIDE_CTX
+#define ENABLE_TRACE_CLIENT_SIDE_CTX
 
 #ifdef DEBUG_HTTP_PROXY
 	#define TRACE_HTTP_PROXY WAWO_INFO
@@ -134,7 +134,7 @@ namespace roger {
 		SOCKS5_CHECK_CMD,
 
 		SOCKS4_PARSE,
-		HTTP_PARSE,
+		HTTP_REQ_PARSE,
 
 		PIPE_PREPARE,
 		
@@ -163,7 +163,7 @@ namespace roger {
 
 		"socks4_parse",
 
-		"http_parse",
+		"http_req_parse",
 
 		"pipe_prepare",
 		"pipe_dialing_stream",
@@ -228,12 +228,17 @@ namespace roger {
 		"Connection: keep-alive\r\n\r\n"
 		"ROGER: server closed with no response, please retry (F5)";
 
+	static const char HTTP_RESP_SERVER_RESPONSE_PARSED_FAILED[] =
+		"HTTP/1.1 541 Server response error\r\n"
+		"Content-Type: text/plain\r\n"
+		"Connection: close\r\n\r\n"
+		"ROGER: server response parse failed";
+
 	static const char HTTP_RESP_PROXY_PIPE_ERROR[] =
 		"HTTP/1.1 541 Proxy pipe error\r\n"
 		"Content-Type: text/plain\r\n"
 		"Connection: close\r\n\r\n"
 		"ROGER: proxy pipe issue";
-
 
 	/*
 	static const char HTTP_RESP_CLIENT_CLOSE[]=
@@ -308,17 +313,19 @@ namespace roger {
 	enum http_conn_state {};
 
 	enum http_request_cancel_code {
-		CANCEL_CODE_SERVER_NO_RESPONSE = 0,
+		CANCEL_CODE_CONNECT_HOST_FAILED=-0,
+		CANCEL_CODE_SERVER_NO_RESPONSE,
 		CANCEL_CODE_PROXY_PIPE_ERROR,
-		CANCEL_CODE_CONNECT_HOST_FAILED,
+		CANCEL_CODE_SERVER_RESPONSE_PARSE_ERROR,
 		HTTP_REQUEST_CANCEL_CODE_MAX
 	};
 
 	static const char* HTTP_RESP_ERROR[HTTP_REQUEST_CANCEL_CODE_MAX] =
 	{
+		HTTP_RESP_CONNECT_HOST_FAILED,
 		HTTP_RESP_SERVER_NO_RESPONSE,
-		HTTP_RESP_PROXY_PIPE_ERROR,
-		HTTP_RESP_CONNECT_HOST_FAILED
+		HTTP_RESP_SERVER_RESPONSE_PARSED_FAILED,
+		HTTP_RESP_PROXY_PIPE_ERROR
 	};
 
 	enum e_stream_write_flag {

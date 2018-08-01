@@ -39,7 +39,6 @@ namespace roger {
 		WWRP<wawo::packet> protocol_packet;
 
 		packet_queue up_to_stream_packets;
-
 		packet_queue down_to_client_packets;
 
 		roger_connect_address_type address_type;
@@ -63,7 +62,7 @@ namespace roger {
 		u32_t resp_count;
 
 		WWRP<wawo::net::protocol::http::parser> http_resp_parser;
-		WWRP<wawo::bytes_ringbuffer> resp_rb;
+//		WWRP<wawo::bytes_ringbuffer> resp_rb;
 		WWSP<wawo::net::protocol::http::message> cur_resp;
 		std::string resp_http_field_tmp;
 
@@ -213,41 +212,25 @@ namespace roger {
 	}
 
 #define _MAX_HTTP_PARSE_STACK (10*1024)
-	inline void _http_parse_down(WWRP<wawo::net::channel_handler_context> const& ctx, WWRP<proxy_ctx> const& pctx, WWRP<wawo::packet> const& income) {
+	inline int _http_parse_down( WWRP<proxy_ctx> const& pctx, WWRP<wawo::packet> const& income) {
 
 		WAWO_ASSERT(income->len());
 		WAWO_ASSERT(pctx->http_resp_parser != NULL);
 
-		WAWO_ASSERT(income->len() <= pctx->resp_rb->left_capacity());
-		pctx->resp_rb->write(income->begin(), income->len());
-
 		int ec = 0;
-		while (pctx->resp_rb->count()) {
-			byte_t _tmp[_MAX_HTTP_PARSE_STACK] = { 0 };
-			u32_t npeek = pctx->resp_rb->peek(_tmp, _MAX_HTTP_PARSE_STACK);
-
-			u32_t nparsed = pctx->http_resp_parser->parse((char*)_tmp, npeek, ec);
+		while (income->len()) {
+			u32_t nparsed = pctx->http_resp_parser->parse((char*)income->begin(), income->len(), ec);
 			WAWO_ASSERT(nparsed >= 0);
-			pctx->resp_rb->skip(nparsed);
+			income->skip(nparsed);
 
 			if (ec != wawo::OK) {
-				ctx->close();
-				pctx->resp_rb->reset();
-
-				message_queue empty_q;
-				std::swap(empty_q, pctx->reqs);
-
-				/*
-				* @TODO, for HEP_INVALID_CONSTANT ISSUE, need investigate
-				*
-				*/
-				pctx->ch_stream_ctx->close();
-				WAWO_WARN("[roger][s%u]mux resp, parse failed: %u, close stream", pctx->ch_stream_ctx->ch->ch_id(), ec);
+				WAWO_WARN("[roger][s%u]mux resp, parse failed: %u", pctx->ch_stream_ctx->ch->ch_id(), ec);
 				break;
 			}
-
-			TRACE_HTTP_PROXY("[roger][s%u]parsed bytes: %u", pctx->ch_stream_ctx->ch->ch_id(), nparsed);
 		}
+
+		TRACE_HTTP_PROXY("[roger][s%u]parsed bytes: %u, income: %u", pctx->ch_stream_ctx->ch->ch_id(), nparsed, income->len() );
+		return ec;
 	}
 
 	static inline void cancel_all_ctx_reqs(WWRP<proxy_ctx> const& http_ctx, int const& cancel_code) {
@@ -313,8 +296,11 @@ namespace roger {
 				cancel_all_ctx_reqs(pctx, CANCEL_CODE_CONNECT_HOST_FAILED);
 			}
 			else {
-				WAWO_ASSERT(!"TODO");
-				//_http_parse_down(ctx, pctx, income);
+				int ec = _http_parse_down(pctx, downp);
+				if (ec != wawo::OK) {
+					cancel_all_ctx_reqs(pctx, CANCEL_CODE_SERVER_RESPONSE_PARSE_ERROR);
+					pctx->ch_stream_ctx->close();
+				}
 			}
 		}
 		break;
@@ -514,8 +500,6 @@ namespace roger {
 			});
 		}
 
-
-
 		void read(WWRP<wawo::net::channel_handler_context> const& ctx, WWRP<wawo::packet> const& income) {
 			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
 			WAWO_ASSERT(pctx != NULL);
@@ -538,7 +522,13 @@ namespace roger {
 					case PIPE_DIAL_SERVER_OK:
 					{
 						if (pctx->type == T_HTTP) {
-							_http_parse_down(ctx, pctx, income);
+							//@TODO, for HEP_INVALID_CONSTANT ISSUE, need a investigation
+							int ec = _http_parse_down(pctx, income);
+							if (ec != wawo::OK) {
+								message_queue empty_q;
+								std::swap(empty_q, pctx->reqs);
+								pctx->ch_stream_ctx->close();
+							}
 						} else {
 							ctx_down(pctx, income);
 						}
@@ -682,7 +672,7 @@ namespace roger {
 						pctx->ch_client_ctx->close();
 						goto __end_check;
 					} else {
-						pctx->state = HTTP_PARSE;
+						pctx->state = HTTP_REQ_PARSE;
 						pctx->http_req_parser = roger::http::make_http_req_parser();
 						pctx->http_req_parser->ctx = pctx;
 					}
@@ -800,7 +790,7 @@ namespace roger {
 							WWRP<packet> downp = wawo::make_ref<packet>(64);
 							resp_connect_result_to_client(pctx, downp, rt);
 							pctx->ch_client_ctx->close();
-							WAWO_WARN("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
+							WAWO_INFO("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
 								, sid, rt, wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port);
 						}
 					});
@@ -837,11 +827,11 @@ namespace roger {
 				goto __end_check;
 			}
 			break;
-			case HTTP_PARSE:
+			case HTTP_REQ_PARSE:
 			{
 				WAWO_ASSERT(pctx->http_req_parser != NULL);
 				int ec = wawo::OK;
-				while (income->len() && pctx->state == HTTP_PARSE) {
+				while (income->len() && pctx->state == HTTP_REQ_PARSE) {
 					u32_t nparsed = pctx->http_req_parser->parse((char const *)income->begin(), income->len(), ec);
 					WAWO_ASSERT(nparsed <= income->len());
 					income->skip(nparsed);
@@ -855,7 +845,6 @@ namespace roger {
 					}
 				}//end for __HTTP_PARSE tag
 
-				 //flush all left to remote server
 				if (pctx->type == T_HTTPS && pctx->sub_state == S_ON_MESSAGE_COMPLETE) {
 					WAWO_ASSERT(pctx->state == PIPE_PREPARE);
 					WAWO_ASSERT(pctx->cur_req->opt == wawo::net::protocol::http::O_CONNECT);
@@ -868,6 +857,9 @@ namespace roger {
 			{
 				WAWO_ASSERT(!"TODO"); //check whether code has been forwarded
 			}
+			break;
+			case HTTP_PARSE_ERROR:
+			{}
 			break;
 			default:
 			{

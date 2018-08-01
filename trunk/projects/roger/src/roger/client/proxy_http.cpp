@@ -236,12 +236,12 @@ namespace roger { namespace http {
 			if (wawo::net::is_dotipv4_decimal_notation(pctx->dst_domain.c_str())) {
 				wawo::net::ipv4_t _ip;
 				wawo::net::dotiptoip(pctx->dst_domain.c_str(), _ip);
-				pctx->dst_ipv4 = ::ntohl(_ip);
+				pctx->dst_ipv4 = _ip;
 				pctx->address_type = IPV4;
 			}
 
 			if (pctx->type == T_HTTPS) {
-				//for https connection, on client on mux stream
+				//for https connection, one client one mux stream
 				WAWO_ASSERT(pctx->cur_req->opt == wawo::net::protocol::http::O_CONNECT);
 				return OK;
 			}
@@ -256,8 +256,8 @@ namespace roger { namespace http {
 				pctx->cur_req->is_header_contain_connection_close = true;
 			}
 
-			if (pctx->dst_domain.length()>4096) {
-				WAWO_ERR("[roger][s%u]invalid url: %s, len exceed 4096", pctx->dst_domain.c_str() );
+			if (pctx->dst_domain.length()>=512) {
+				WAWO_ERR("[roger][s%u]invalid url: %s, len exceed 512", pctx->dst_domain.c_str() );
 				//invalid http url host
 				return WAWO_NEGATIVE(HPE_INVALID_URL);
 			}
@@ -293,24 +293,37 @@ namespace roger { namespace http {
 				pctx->cur_req_ctx = _pctx;
 
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
-				wawo::net::handler::mux_stream_id_t id = wawo::net::handler::mux_make_stream_id();
-				WWRP<wawo::net::channel_future> ch_muxs_f = mux_->dial_stream(id, [](WWRP<wawo::net::channel> const& ch) {
+				wawo::net::handler::mux_stream_id_t sid = wawo::net::handler::mux_make_stream_id();
+
+				int ec;
+				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid, ec);
+				WAWO_ASSERT(ec == wawo::OK);
+
+				WWRP<wawo::net::channel_promise> dial_f = muxs->make_promise();
+				dial_f->add_listener([_pctx,sid](WWRP<wawo::net::channel_future> const& f) {
+					int rt = f->get();
+					if (rt == wawo::OK) {
+						f->channel()->set_ctx(_pctx);
+					}
+					_pctx->ch_client_ctx->ch->event_poller()->execute([sid,rt,_pctx]() {
+						if (rt == wawo::OK) {
+							_pctx->state = PIPE_DIAL_STREAM_OK;
+						} else {
+							WAWO_ASSERT(!"TODO");
+							WAWO_INFO("[proxy_http]make stream failed for: %s", _pctx->cur_req->url.c_str());
+							_pctx->state = PIPE_DIAL_STREAM_FAILED;
+							WAWO_INFO("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
+								, sid, rt, wawo::net::ipv4todotip(_pctx->dst_ipv4).c_str(), _pctx->dst_port);
+						}
+					});
+				});
+
+				muxs->dial([](WWRP<wawo::net::channel> const& ch) {
 					ch->ch_set_read_buffer_size(roger::mux_stream_sbc.rcv_size);
 					ch->ch_set_write_buffer_size(roger::mux_stream_sbc.snd_size);
 					WWRP<mux_stream_handler> h = wawo::make_ref<mux_stream_handler>();
 					ch->pipeline()->add_last(h);
-				});
-
-				ch_muxs_f->add_listener([_pctx](WWRP<wawo::net::channel_future> const& f) {
-					int rt = f->get();
-					if (rt == wawo::OK) {
-						_pctx->state = PIPE_DIAL_STREAM_OK;
-						f->channel()->set_ctx(_pctx);
-					} else {
-						WAWO_INFO("[proxy_http]make stream failed for: %s", _pctx->cur_req->url.c_str());
-						_pctx->state = PIPE_DIAL_STREAM_FAILED;
-					}
-				});
+				}, dial_f);
 			} else {
 				pctx->cur_req_ctx = it->second;
 			}
@@ -321,7 +334,7 @@ namespace roger { namespace http {
 				case PIPE_DIALING_STREAM:
 				case PIPE_DIAL_STREAM_OK:
 				case PIPE_DIALING_SERVER:
-				case HTTP_PARSE:
+				case HTTP_REQ_PARSE:
 				{
 					TRACE_HTTP_PROXY("[roger][s%u]push_back req: %s", pctx->cur_req_ctx->ch_stream_ctx->ch->ch_id(), pctx->cur_req_ctx->cur_req->url.c_str());
 					pctx->cur_req_ctx->reqs.push(pctx->cur_req);
@@ -377,7 +390,8 @@ namespace roger { namespace http {
 			pctx->sub_state = S_ON_MESSAGE_COMPLETE;
 
 			if (pctx->type == T_HTTPS) {
-				WAWO_ASSERT(pctx->state == HTTP_PARSE);
+				//directly return
+				WAWO_ASSERT(pctx->state == HTTP_REQ_PARSE);
 				pctx->state = PIPE_PREPARE;
 				return -99999;
 			}
@@ -396,6 +410,7 @@ namespace roger { namespace http {
 			}
 
 			if (pctx->cur_req->is_header_contain_connection_close == true) {
+				pctx->client_read_closed = true;
 				pctx->cur_req_ctx->ch_stream_ctx->shutdown_write();
 			}
 
@@ -492,7 +507,7 @@ namespace roger { namespace http {
 			WAWO_ASSERT(pctx->cur_resp != NULL);
 
 			switch (pctx->state) {
-			case HTTP_PARSE:
+			case HTTP_REQ_PARSE:
 			{				
 				pctx->resp_header_connection_close = false; //default is false
 				if (pctx->cur_resp->h.get("Connection") == "close" ||
