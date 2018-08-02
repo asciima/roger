@@ -219,7 +219,7 @@ namespace roger {
 		"HTTP/1.1 504 Connection timeout\r\n"
 		"Content-Type: text/plain\r\n"
 		"Connection: close\r\n\r\n"
-		"ROGER: connect to host failed\r\n";
+		"ROGER: connect to host timeout\r\n";
 
 	//refer to https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#4xx_Client_errors
 	static const char HTTP_RESP_SERVER_NO_RESPONSE[] =

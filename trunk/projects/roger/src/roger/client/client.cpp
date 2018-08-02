@@ -29,9 +29,6 @@
 			return -1;
 		}
 
-		//	int a = 3;
-		//	WAWO_ASSERT(a < 1);
-
 		wawo::app _app;
 
 		std::string ip(argv[1]);
@@ -44,12 +41,6 @@
 	connect_mux:
 		WWRP < wawo::net::channel_future> dial_f = wawo::net::socket::dial(dialurl, [](WWRP<wawo::net::channel> const& ch) {
 
-//			WWRP<wawo::net::channel_handler_abstract> h_outlen = wawo::make_ref<wawo::net::handler::dump_out_len>();
-//			ch->pipeline()->add_last(h_outlen);
-
-//			WWRP<wawo::net::channel_handler_abstract> h_inlen = wawo::make_ref<wawo::net::handler::dump_in_len>();
-//			ch->pipeline()->add_last(h_inlen);
-			
 			WWRP<wawo::net::channel_handler_abstract> h_hlen = wawo::make_ref<wawo::net::handler::hlen>();
 			ch->pipeline()->add_last(h_hlen);
 
