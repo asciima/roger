@@ -2,13 +2,9 @@
 #include "../shared/shared.hpp"
 #include "protocols.hpp"
 
-namespace roger {
-	using namespace wawo::net::protocol::http;
-	WWRP<parser> make_http_req_parser();
-	WWRP<parser> make_http_resp_parser();
-}
 
 namespace roger {
+	using namespace wawo::net::protocol::http;
 
 	typedef std::unordered_map <std::string, WWRP<proxy_ctx> > stream_http_proxy_ctx_map_t;
 	typedef std::pair <std::string, WWRP<proxy_ctx>> stream_http_proxy_ctx_pair_t;
@@ -282,19 +278,22 @@ namespace roger {
 		switch (ctx->state) {
 		case PIPE_DIALING_STREAM:
 		{
+			WAWO_ASSERT(ctx->ch_stream_ctx == NULL);
 			WAWO_ASSERT(up != NULL);
 			ctx->pending_outp.push(up);
 		}
 		break;
 		case PIPE_DIAL_STREAM_OK:
 		case PIPE_DIALING_SERVER:
-		case HTTP_REQ_PARSE:
+		case PIPE_DIAL_SERVER_OK:
 		{
 			while (ctx->pending_outp.size()) {
 				WWRP<wawo::packet>& t = ctx->pending_outp.front();
 				ctx_up(ctx, t);
 				ctx->pending_outp.pop();
 			}
+			WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
+
 			TRACE_HTTP_PROXY("[roger][s%u]push_back req: %s", pctx->cur_req_ctx->ch_stream_ctx->ch->ch_id(), pctx->cur_req_ctx->cur_req->url.c_str());
 			ctx_up(ctx, up);
 		}
@@ -318,15 +317,12 @@ namespace roger {
 				ctx->stream_read_closed = true;
 			}
 		}
-		http_down(ctx, down);
+		ctx_down(ctx, down);
 	}
 
 #define _MAX_HTTP_PARSE_STACK (10*1024)
 	static inline int http_parse_down( WWRP<proxy_ctx> const& pctx, WWRP<wawo::packet> const& income) {
-
-		WAWO_ASSERT(income->len());
 		WAWO_ASSERT(pctx->http_resp_parser != NULL);
-
 		int ec = 0;
 		while (income->len()) {
 			u32_t nparsed = pctx->http_resp_parser->parse((char*)income->begin(), income->len(), ec);
@@ -338,7 +334,6 @@ namespace roger {
 				break;
 			}
 		}
-
 		TRACE_HTTP_PROXY("[roger][s%u]parsed bytes: %u, income: %u", pctx->ch_stream_ctx->ch->ch_id(), nparsed, income->len() );
 		return ec;
 	}
@@ -524,22 +519,24 @@ namespace roger {
 
 			pctx->ch_client_ctx->event_poller()->execute([pctx,ctx]() {
 
-				if (pctx->type == T_HTTP) {
-					WAWO_ASSERT(pctx->http_resp_parser == NULL);
-					pctx->http_resp_parser = make_http_resp_parser();
-					pctx->http_resp_parser->ctx = pctx;
-				}
-
 				WAWO_ASSERT(pctx->state == PIPE_DIAL_STREAM_OK);
 				TRACE_CLIENT_SIDE_CTX("[roger][s%d]stream connected", ctx->ch->ch_id());
 				pctx->ch_stream_ctx = ctx;
 				pctx->state = PIPE_DIALING_SERVER;
-				if (pctx->protocol_packet->len()) {
-					WWRP<wawo::packet> _up = wawo::make_ref<wawo::packet>(pctx->protocol_packet->len());
-					_up->write(pctx->protocol_packet->begin(), pctx->protocol_packet->len());
-					pctx->protocol_packet->reset();
-					ctx_up(pctx,_up,false);
+
+				if (pctx->type == T_HTTP) {
+					WAWO_ASSERT(pctx->http_resp_parser == NULL);
+					pctx->http_resp_parser = make_http_resp_parser();
+					pctx->http_resp_parser->ctx = pctx;
+				} else {
+					if (pctx->protocol_packet->len()) {
+						WWRP<wawo::packet> _up = wawo::make_ref<wawo::packet>(pctx->protocol_packet->len());
+						_up->write(pctx->protocol_packet->begin(), pctx->protocol_packet->len());
+						pctx->protocol_packet->reset();
+						ctx_up(pctx,_up,false);
+					}
 				}
+
 				WWRP<wawo::packet> outp = make_packet_CMD_CONNECT(pctx);
 				WWRP<wawo::net::channel_future> f = pctx->ch_stream_ctx->write(outp);
 				f->add_listener([pctx](WWRP<wawo::net::channel_future> const& f) {
@@ -589,11 +586,11 @@ namespace roger {
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 			pctx->ch_client_ctx->event_poller()->execute([pctx,ctx]() {
 				ctx->ch->set_ctx(NULL);
-				WAWO_ASSERT(pctx->parent != NULL);
-				WWRP<proxy_ctx> ppctx = pctx->parent;
-
 				TRACE_CLIENT_SIDE_CTX("[roger][s%d]stream closed", ctx->ch->ch_id());
 				if (pctx->type == T_HTTP) {
+					WAWO_ASSERT(pctx->parent != NULL);
+					WWRP<proxy_ctx> ppctx = pctx->parent;
+
 					WAWO_ASSERT(pctx->reqs.size() == 0);
 					WAWO_ASSERT(pctx->http_proxy_ctx_map.size() == 0);
 					WAWO_ASSERT(pctx->http_resp_parser == NULL);
@@ -620,7 +617,13 @@ namespace roger {
 						int32_t code = income->read<int32_t>();
 						if (WAWO_LIKELY(code == wawo::OK)) {
 							pctx->state = PIPE_DIAL_SERVER_OK;
-							ctx_up(pctx, NULL);
+
+							if (pctx->type == T_HTTP) {
+								http_up(pctx, NULL);
+							}
+							else {
+								ctx_up(pctx, NULL);
+							}
 						}
 						resp_connect_result_to_client(pctx, income, code);
 					}
@@ -650,18 +653,6 @@ namespace roger {
 		}
 	};
 
-	enum protocol_parse_error {
-		E_WAIT_BYTES_ARRIVE = 1,
-		E_OK = 0,
-		E_NOT_SOCKS4_PROTOCOL = -1,
-		E_UNSUPPORTED_SOCKS4_CMD = -2,
-		E_INVALID_DST_IP = -3,
-		E_CLIENT_SOCKET_ERROR = -4,
-		E_SOCKS5_UNKNOWN_ATYPE = -5,
-		E_SOCKS5_MISSING_IP_OR_PORT = -6,
-		E_SOCKS5_INVALID_DOMAIN = -7,
-		E_UNKNOWN_HTTP_METHOD = -8
-	};
 
 	class local_proxy_handler :
 		public wawo::net::channel_inbound_handler_abstract,
@@ -688,7 +679,27 @@ namespace roger {
 			WAWO_ASSERT(pctx != NULL);
 			TRACE_CLIENT_SIDE_CTX("[roger][#%d]client read closed", ctx->ch->ch_id());
 			pctx->client_read_closed = true;
-			ctx_up(pctx, NULL);
+
+			if (pctx->http_req_parser != NULL) {
+				WAWO_ASSERT(pctx->type == T_HTTP || pctx->type == T_HTTPS);
+				WAWO_ASSERT(pctx->http_req_parser != NULL);
+				pctx->http_req_parser->deinit();
+				pctx->http_req_parser->ctx = NULL;
+				pctx->http_req_parser = NULL;
+			}
+
+			if (pctx->type == T_HTTP) {
+				std::for_each(pctx->http_proxy_ctx_map.begin(), pctx->http_proxy_ctx_map.end(), [](stream_http_proxy_ctx_pair_t const& pair) {
+					WWRP<proxy_ctx> _pctx = pair.second;
+					WAWO_ASSERT(_pctx->http_req_parser == NULL);
+
+					WAWO_ASSERT(_pctx->parent != NULL);
+					_pctx->client_read_closed = true;
+					http_up(_pctx, NULL);
+				});
+			} else {
+				ctx_up(pctx, NULL);
+			}
 		}
 
 		void closed(WWRP<wawo::net::channel_handler_context > const& ctx) {
@@ -696,27 +707,6 @@ namespace roger {
 			WAWO_ASSERT(pctx != NULL);
 			ctx->ch->set_ctx(NULL);
 			TRACE_CLIENT_SIDE_CTX("[roger][#%d]client closed", ctx->ch->ch_id());
-
-			if (pctx->type == T_HTTP || pctx->type == T_HTTPS) {
-				WAWO_ASSERT(pctx->http_req_parser != NULL);
-				pctx->http_req_parser->deinit();
-				pctx->http_req_parser->ctx = NULL;
-				pctx->http_req_parser = NULL;
-
-				WAWO_ASSERT(pctx->http_resp_parser == NULL);
-
-				if (pctx->type == T_HTTP) {
-					std::for_each(pctx->http_proxy_ctx_map.begin(), pctx->http_proxy_ctx_map.end(), [](stream_http_proxy_ctx_pair_t const& pair) {
-						WWRP<proxy_ctx> _pctx = pair.second;
-						WAWO_ASSERT(_pctx->http_req_parser == NULL);
-						WAWO_ASSERT(_pctx->http_resp_parser != NULL);
-
-						WAWO_ASSERT(_pctx->parent != NULL);
-						_pctx->client_read_closed = true;
-						http_up(_pctx, NULL);
-					});
-				}
-			}
 			WAWO_ASSERT(pctx->client_read_closed == true);
 		}
 
@@ -1004,7 +994,7 @@ namespace roger {
 	public:
 		void on_request(WWRP<wawo::net::channel_handler_context> const& ctx, WWSP<wawo::net::protocol::http::message> const& m) {
 			WAWO_ASSERT(m->type == wawo::net::protocol::http::T_REQ);
-			WAWO_INFO("[http_server]request url: %s", m->url.c_str());
+			WAWO_INFO("[http_server]request uri: %s", m->url.c_str());
 
 			std::string proxy_type = std::string("PROXY");
 			int is_socks5_url = wawo::strpos(m->url.c_str(), "socks5.pac");

@@ -482,8 +482,13 @@ namespace roger {
 				flush_up(fctx, income);
 			}
 			break;
+			case LOOKUP_SERVER_NAEM_FAILED:
+			{
+				WAWO_ASSERT(!"WHAT");
+			}
+			break;
 			default:
-		{
+			{
 				WAWO_ASSERT(!"WHAT");
 				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
 				fctx->ch_stream_ctx->close();

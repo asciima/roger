@@ -153,23 +153,26 @@ namespace roger {
 			WAWO_ASSERT(pctx->cur_req != NULL);
 
 			pctx->cur_req->ver = p->ver;
-			WAWO_ASSERT(pctx->dst_domain.length() ==0 );
 			pctx->sub_state = S_ON_HEADERS_COMPLETE;
-			pctx->address_type = HOST;
-			pctx->dst_domain = pctx->cur_req->urlfields.host;
-			pctx->dst_port = pctx->cur_req->urlfields.port;
-			WAWO_ASSERT(pctx->dst_domain.length() > 0);
-			WAWO_ASSERT(pctx->dst_port > 0);
+
+			roger_connect_address_type address_type = HOST;
+			std::string domain = pctx->cur_req->urlfields.host;
+			ipv4_t ipv4 = 0;
+			port_t port = pctx->cur_req->urlfields.port;
+
+			WAWO_ASSERT(domain.length() > 0);
+			WAWO_ASSERT(port > 0);
 
 			//adjust for xx.xx.xx.xx
 			if (wawo::net::is_dotipv4_decimal_notation(pctx->dst_domain.c_str())) {
-				wawo::net::ipv4_t _ip;
-				wawo::net::dotiptoip(pctx->dst_domain.c_str(), _ip);
-				pctx->dst_ipv4 = _ip;
-				pctx->address_type = IPV4;
+				wawo::net::dotiptoip(pctx->dst_domain.c_str(), ipv4);
+				address_type = IPV4;
 			}
 
 			if (pctx->type == T_HTTPS) {
+				pctx->address_type = address_type;
+				pctx->dst_domain = domain;
+				pctx->dst_port = port;
 				//for https connection, one client one mux stream
 				WAWO_ASSERT(pctx->cur_req->opt == wawo::net::protocol::http::O_CONNECT);
 				return OK;
@@ -198,7 +201,6 @@ namespace roger {
 			if (it == pctx->http_proxy_ctx_map.end()) {
 				//no entry for this request, create new and append to parent
 				WWRP<proxy_ctx> _pctx = wawo::make_ref<proxy_ctx>();
-				_pctx->parent = pctx;
 				_pctx->type = T_HTTP;
 				_pctx->state = PIPE_DIALING_STREAM;
 
@@ -210,10 +212,10 @@ namespace roger {
 
 				_pctx->ch_client_ctx = pctx->ch_client_ctx;
 
-				_pctx->address_type = pctx->address_type;
-				_pctx->dst_domain = pctx->dst_domain;
-				_pctx->dst_ipv4 = pctx->dst_ipv4;
-				_pctx->dst_port = pctx->dst_port;
+				_pctx->address_type = address_type;
+				_pctx->dst_domain = domain;
+				_pctx->dst_ipv4 = ipv4;
+				_pctx->dst_port = port;
 
 				pctx->cur_req_ctx = _pctx;
 
@@ -224,6 +226,7 @@ namespace roger {
 				_pctx->HP_key = _HP_key;
 				_pctx->cur_req_in_chunk_body = false;
 
+				_pctx->parent = pctx;
 				pctx->http_proxy_ctx_map.insert({ _HP_key, _pctx });
 
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
@@ -242,7 +245,6 @@ namespace roger {
 					_pctx->ch_client_ctx->ch->event_poller()->execute([_HP_key,sid,rt,_pctx,pctx]() {
 						if (rt == wawo::OK) {
 							_pctx->state = PIPE_DIAL_STREAM_OK;
-							http_up(_pctx,NULL);
 						} else {
 							_pctx->state = PIPE_DIAL_STREAM_FAILED;
 							WWRP<wawo::packet> down = wawo::make_ref<wawo::packet>(256);
@@ -272,7 +274,6 @@ namespace roger {
 				pctx->cur_req_ctx = it->second;
 			}
 
-			WAWO_ASSERT(pctx->cur_req_ctx->ch_stream_ctx != NULL);
 			pctx->cur_req_ctx->reqs.push(pctx->cur_req);
 			WWRP<wawo::packet> H;
 			encode_http_header(pctx->cur_req, H);
@@ -496,8 +497,6 @@ namespace roger {
 			WAWO_ASSERT(pctx->parent != NULL);
 			WWRP<proxy_ctx> ppctx = pctx->parent;
 
-			++pctx->resp_count;
-			pctx->cur_resp = NULL;
 
 			if (pctx->resp_in_chunk_body) {
 				pctx->resp_in_chunk_body = false;
@@ -531,6 +530,8 @@ namespace roger {
 				TRACE_HTTP_PROXY("[roger][s%u]pop req for message complete: %s", pctx->ch_stream_ctx->ch->ch_id(), _m->url.c_str());
 				pctx->reqs.pop();
 			}
+			pctx->cur_resp = NULL;
+			++pctx->resp_count;
 
 			TRACE_HTTP_PROXY("[roger][http][s%u]resp message complete", pctx->ch_stream_ctx->ch->ch_id());
 			return wawo::OK;
