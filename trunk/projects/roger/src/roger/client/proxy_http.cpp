@@ -164,14 +164,15 @@ namespace roger {
 			WAWO_ASSERT(port > 0);
 
 			//adjust for xx.xx.xx.xx
-			if (wawo::net::is_dotipv4_decimal_notation(pctx->dst_domain.c_str())) {
-				wawo::net::dotiptoip(pctx->dst_domain.c_str(), ipv4);
+			if (wawo::net::is_dotipv4_decimal_notation(domain.c_str())) {
+				wawo::net::dotiptoip(domain.c_str(), ipv4);
 				address_type = IPV4;
 			}
 
 			if (pctx->type == T_HTTPS) {
 				pctx->address_type = address_type;
 				pctx->dst_domain = domain;
+				pctx->dst_ipv4 = ipv4;
 				pctx->dst_port = port;
 				//for https connection, one client one mux stream
 				WAWO_ASSERT(pctx->cur_req->opt == wawo::net::protocol::http::O_CONNECT);
@@ -190,13 +191,13 @@ namespace roger {
 				pctx->cur_req->is_header_contain_connection_close = true;
 			}
 
-			if (pctx->dst_domain.length()>=512) {
-				WAWO_ERR("[roger][s%u]invalid url: %s, len exceed 512", pctx->dst_domain.c_str() );
+			if (domain.length()>=512) {
+				WAWO_ERR("[roger][s%u]invalid url: %s, len exceed 512", domain.c_str() );
 				//invalid http url host
 				return WAWO_NEGATIVE(HPE_INVALID_URL);
 			}
 
-			std::string _HP_key = pctx->dst_domain + ":"+ std::to_string(pctx->dst_port);
+			std::string _HP_key = domain + ":"+ std::to_string(port);
 			stream_http_proxy_ctx_map_t::iterator it = pctx->http_proxy_ctx_map.find(_HP_key);
 			if (it == pctx->http_proxy_ctx_map.end()) {
 				//no entry for this request, create new and append to parent
@@ -231,7 +232,7 @@ namespace roger {
 
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
 				wawo::net::handler::mux_stream_id_t sid = wawo::net::handler::mux_make_stream_id();
-
+				WAWO_INFO("[proxy_http]new sid: %u", sid);
 				int ec;
 				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid, ec);
 				WAWO_ASSERT(ec == wawo::OK);

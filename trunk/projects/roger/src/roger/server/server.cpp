@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
 	std::vector<wawo::len_cstr> ns;
 #if WAWO_ISWIN
 //	ns.push_back("192.168.0.1");
-	ns.push_back("192.168.1.1");
+//	ns.push_back("192.168.1.1");
 //	ns.push_back("192.168.2.1");
 	ns.push_back("100.64.10.2");
 	ns.push_back("100.64.10.3");

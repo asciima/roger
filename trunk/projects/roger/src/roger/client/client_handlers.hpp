@@ -125,7 +125,6 @@ namespace roger {
 			}
 			break;
 		}
-
 	}
 	inline void ctx_up_done(WWRP<proxy_ctx> const& ctx, int flushrt) {
 		WAWO_ASSERT(ctx->ch_client_ctx != NULL);
@@ -279,8 +278,9 @@ namespace roger {
 		case PIPE_DIALING_STREAM:
 		{
 			WAWO_ASSERT(ctx->ch_stream_ctx == NULL);
-			WAWO_ASSERT(up != NULL);
-			ctx->pending_outp.push(up);
+			if (up != NULL) {
+				ctx->pending_outp.push(up);
+			}
 		}
 		break;
 		case PIPE_DIAL_STREAM_OK:
@@ -762,14 +762,13 @@ namespace roger {
 						pctx->ch_client_ctx->close();
 						goto __end_check;
 					} else {
+						pctx->protocol_packet->reset();
 						pctx->state = HTTP_REQ_PARSE;
 						pctx->http_req_parser = roger::make_http_req_parser();
 						pctx->http_req_parser->ctx = pctx;
 					}
 				}
-				if (pctx->protocol_packet->len()) {
-					goto _begin_check;
-				}
+				goto _begin_check;
 			}
 			break;
 			case SOCKS5_CHECK_AUTH:
@@ -936,6 +935,7 @@ namespace roger {
 				}//end for __HTTP_PARSE tag
 
 				if (pctx->type == T_HTTPS && pctx->sub_state == S_ON_MESSAGE_COMPLETE) {
+					WAWO_ASSERT(income->len() == 0);
 					WAWO_ASSERT(pctx->state == PIPE_PREPARE);
 					WAWO_ASSERT(pctx->cur_req->opt == wawo::net::protocol::http::O_CONNECT);
 					goto _begin_check;
