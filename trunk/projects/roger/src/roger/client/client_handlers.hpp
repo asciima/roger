@@ -804,7 +804,7 @@ namespace roger {
 				}
 				int check_rt = _socks5_check_cmd(pctx);
 				if (check_rt == E_OK) {
-					pctx->state == PIPE_PREPARE;
+					pctx->state = PIPE_PREPARE;
 					goto _begin_check;
 				}
 				else if (check_rt < 0) {
