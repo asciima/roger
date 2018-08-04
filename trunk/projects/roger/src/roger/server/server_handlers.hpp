@@ -55,6 +55,7 @@ namespace roger {
 		WAWO_ASSERT(fctx->up_state == ctx_write_state::WS_WRITING);
 		fctx->up_state = ctx_write_state::WS_IDLE;
 		if (flushrt == wawo::OK) {
+			TRACE_SERVER_SIDE_CTX("[server][s%u]write to server done: %u",fctx->ch_stream_ctx->ch->ch_id(), fctx->up_to_server_packets.front()->len() );
 			WAWO_ASSERT(fctx->up_to_server_packets.size());
 			fctx->up_to_server_packets.pop();
 			_do_flush_up(fctx);
@@ -482,16 +483,16 @@ namespace roger {
 				flush_up(fctx, income);
 			}
 			break;
+			case DIAL_SERVER_FAILED:
 			case LOOKUP_SERVER_NAEM_FAILED:
 			{
-				WAWO_ASSERT(!"WHAT");
+				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
+				fctx->ch_stream_ctx->close();
 			}
 			break;
 			default:
 			{
 				WAWO_ASSERT(!"WHAT");
-				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
-				fctx->ch_stream_ctx->close();
 				WAWO_ERR("[roger]unknown server state: %d", fctx->state);
 			}
 			break;

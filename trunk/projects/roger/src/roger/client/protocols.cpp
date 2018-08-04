@@ -279,11 +279,9 @@ namespace roger {
 			if (wawo::strpos((char*)upper, wawo::net::protocol::http::option_name[i]) != -1) {
 				if (i == wawo::net::protocol::http::O_CONNECT) {
 					pctx->type = T_HTTPS;
-					pctx->sub_state = http_req_sub_state::S_IDLE;
 					return E_OK;
 				} else {
 					pctx->type = T_HTTP;
-					pctx->sub_state = http_req_sub_state::S_IDLE;
 					return E_OK;
 				}
 			}

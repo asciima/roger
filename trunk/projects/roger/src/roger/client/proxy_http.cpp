@@ -71,7 +71,7 @@ namespace roger {
 				, m->ver.minor);
 		}
 
-		WAWO_ASSERT(nrequest > 0);
+		WAWO_ASSERT((nrequest > 0) && nrequest<8192);
 
 		WWRP<packet> H;
 		m->h.encode(H);
@@ -89,8 +89,9 @@ namespace roger {
 			pctx->cur_req = wawo::make_shared<protocol::http::message>();
 			pctx->cur_req->type = T_REQ;
 			pctx->cur_req->is_header_contain_connection_close = false;
-			pctx->sub_state = S_ON_MESSAGE_BEGIN;
 
+			pctx->cur_req_has_chunk_body = false;
+			pctx->cur_req_in_chunk_body = false;
 			return wawo::OK;
 		}
 
@@ -110,12 +111,13 @@ namespace roger {
 			//check url:https://tools.ietf.org/html/rfc2616#page-128 to process a empty host string
 			if( pctx->cur_req->urlfields.host.length() == 0 ){
 				WAWO_WARN("opt: %s, data: %s", wawo::net::protocol::http::option_name[pctx->cur_req->opt], data);
-			}	
+			}
 
 			WAWO_ASSERT(pctx->cur_req->urlfields.host.length() > 0);
 			return wawo::OK;
 		}
 
+		/*
 		int on_status(WWRP<parser> const& p, const char* data, u32_t const& len) {
 			WAWO_ASSERT(!"what, http request message should not have this header line");
 
@@ -125,7 +127,7 @@ namespace roger {
 
 			return wawo::OK;
 		}
-
+		*/
 		int on_header_field(WWRP<parser> const& p, const char* data, u32_t const& len) {
 			WAWO_ASSERT(p->ctx != NULL);
 
@@ -153,7 +155,6 @@ namespace roger {
 			WAWO_ASSERT(pctx->cur_req != NULL);
 
 			pctx->cur_req->ver = p->ver;
-			pctx->sub_state = S_ON_HEADERS_COMPLETE;
 
 			roger_connect_address_type address_type = HOST;
 			std::string domain = pctx->cur_req->urlfields.host;
@@ -162,6 +163,12 @@ namespace roger {
 
 			WAWO_ASSERT(domain.length() > 0);
 			WAWO_ASSERT(port > 0);
+
+			if (domain.length() >= 512) {
+				WAWO_ERR("[roger][s%u]invalid url: %s, len exceed 512", domain.c_str());
+				//invalid http url host
+				return WAWO_NEGATIVE(HPE_INVALID_URL);
+			}
 
 			//adjust for xx.xx.xx.xx
 			if (wawo::net::is_dotipv4_decimal_notation(domain.c_str())) {
@@ -189,12 +196,6 @@ namespace roger {
 				pctx->cur_req->h.get("connection") == "close"
 				) {
 				pctx->cur_req->is_header_contain_connection_close = true;
-			}
-
-			if (domain.length()>=512) {
-				WAWO_ERR("[roger][s%u]invalid url: %s, len exceed 512", domain.c_str() );
-				//invalid http url host
-				return WAWO_NEGATIVE(HPE_INVALID_URL);
 			}
 
 			std::string _HP_key = domain + ":"+ std::to_string(port);
@@ -232,12 +233,12 @@ namespace roger {
 
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
 				wawo::net::handler::mux_stream_id_t sid = wawo::net::handler::mux_make_stream_id();
-				WAWO_INFO("[proxy_http]new sid: %u", sid);
+
 				int ec;
 				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid, ec);
 				WAWO_ASSERT(ec == wawo::OK);
-
 				WWRP<wawo::net::channel_promise> dial_f = muxs->make_promise();
+
 				dial_f->add_listener([_HP_key,sid,_pctx,pctx](WWRP<wawo::net::channel_future> const& f) {
 					int rt = f->get();
 					if (rt == wawo::OK) {
@@ -248,23 +249,19 @@ namespace roger {
 							_pctx->state = PIPE_DIAL_STREAM_OK;
 						} else {
 							_pctx->state = PIPE_DIAL_STREAM_FAILED;
-							WWRP<wawo::packet> down = wawo::make_ref<wawo::packet>(256);
-							resp_connect_result_to_client(_pctx, down, rt);
-							WAWO_INFO("[proxy_http]make stream failed for: %s", _pctx->cur_req->url.c_str());
-							_pctx->state = PIPE_DIAL_STREAM_FAILED;
-							WAWO_INFO("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
-								, sid, rt, wawo::net::ipv4todotip(_pctx->dst_ipv4).c_str(), _pctx->dst_port);
+							WAWO_INFO("[client][#%u]dial mux_stream failed:%d, domain: %s:%u", sid, rt, _pctx->dst_domain.c_str(), _pctx->dst_port);
+							WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>();
+							resp_connect_result_to_client(_pctx, downp, rt);
 
 							_pctx->http_resp_parser->deinit();
 							_pctx->http_resp_parser->ctx = NULL;
 							_pctx->http_resp_parser = NULL;
-							pctx->http_proxy_ctx_map.erase(_HP_key);
 
+							pctx->http_proxy_ctx_map.erase(_HP_key);
 							http_down(pctx, NULL);
 						}
 					});
 				});
-
 				muxs->dial([](WWRP<wawo::net::channel> const& ch) {
 					ch->ch_set_read_buffer_size(roger::mux_stream_sbc.rcv_size);
 					ch->ch_set_write_buffer_size(roger::mux_stream_sbc.snd_size);
@@ -276,6 +273,8 @@ namespace roger {
 			}
 
 			pctx->cur_req_ctx->reqs.push(pctx->cur_req);
+			TRACE_HTTP_PROXY("[roger][%s]http push req, %s", pctx->HP_key.c_str() , pctx->cur_req->url );
+
 			WWRP<wawo::packet> H;
 			encode_http_header(pctx->cur_req, H);
 			http_up(pctx->cur_req_ctx, H);
@@ -286,24 +285,19 @@ namespace roger {
 			WAWO_ASSERT(p->ctx != NULL);
 
 			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
-			WAWO_ASSERT(pctx->cur_req != NULL);
 			WAWO_ASSERT(pctx->type == T_HTTP);
+
+			WAWO_ASSERT(pctx->cur_req != NULL);
 			WAWO_ASSERT(pctx->cur_req_ctx != NULL);
 
-			WWRP<packet> http_body = wawo::make_ref<wawo::packet>(len + 64); //64 for chunk
-			http_body->write((byte_t*)data, len);
-			WAWO_ASSERT(pctx->cur_req_ctx != NULL);
-
-			if (pctx->cur_req_ctx->cur_req_in_chunk_body) {
-				char hex_string[16] = { 0 };
-				int i = int_to_hex_string(len, hex_string, 16);
-
-				http_body->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
-				http_body->write_left((byte_t*)hex_string, i);
-				http_body->write((byte_t*)WAWO_HTTP_CRLF, 2);
+			if (pctx->cur_req_in_chunk_body) {
+				WAWO_ASSERT(pctx->req_body_tmp != NULL);
+				pctx->req_body_tmp->write((byte_t*)data, len);
+			} else {
+				WWRP<packet> http_body = wawo::make_ref<wawo::packet>(len + 64); //64 for chunk
+				http_body->write((byte_t*)data, len);
+				http_up(pctx->cur_req_ctx, http_body);
 			}
-
-			http_up(pctx->cur_req_ctx, http_body);
 			return wawo::OK;
 		}
 
@@ -312,33 +306,29 @@ namespace roger {
 
 			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
 			WAWO_ASSERT(pctx->cur_req != NULL);
-			pctx->sub_state = S_ON_MESSAGE_COMPLETE;
 
 			if (pctx->type == T_HTTPS) {
 				//directly return
+				WAWO_ASSERT(pctx->cur_req->opt == wawo::net::protocol::http::O_CONNECT);
 				WAWO_ASSERT(pctx->state == HTTP_REQ_PARSE);
 				pctx->state = PIPE_PREPARE;
-				return -99999;
+			} else {
+				WAWO_ASSERT(pctx->cur_req_ctx != NULL);
+				WAWO_ASSERT(pctx->req_body_tmp == NULL);
+
+				if (pctx->cur_req_has_chunk_body) {
+					//forward trailing
+					WWRP<packet> chunk_trailing = wawo::make_ref<packet>(64);
+					static const char* chunk_body_trailing = "0\r\n\r\n";
+					chunk_trailing->write((byte_t*)chunk_body_trailing, 5);
+					http_up(pctx->cur_req_ctx, chunk_trailing);
+				}
+
+				if (pctx->cur_req->is_header_contain_connection_close == true) {
+					pctx->cur_req_ctx->client_read_closed = true;
+					http_up(pctx->cur_req_ctx, NULL);
+				}
 			}
-
-			WAWO_ASSERT(pctx->cur_req != NULL);
-			WAWO_ASSERT(pctx->cur_req_ctx != NULL);
-
-			if (pctx->cur_req_ctx->cur_req_in_chunk_body) {
-				pctx->cur_req_ctx->cur_req_in_chunk_body = false;
-				//forward trailing
-				WWRP<packet> chunk_trailing = wawo::make_ref<packet>(64);
-
-				static const char* chunk_body_trailing = "0\r\n\r\n";
-				chunk_trailing->write((byte_t*)chunk_body_trailing, 5);
-				http_up(pctx->cur_req_ctx, chunk_trailing);
-			}
-
-			if (pctx->cur_req->is_header_contain_connection_close == true) {
-				pctx->cur_req_ctx->client_read_closed = true;
-				http_up(pctx->cur_req_ctx, NULL);
-			}
-
 			pctx->cur_req_ctx = NULL;
 			pctx->cur_req = NULL;
 
@@ -346,21 +336,30 @@ namespace roger {
 		}
 
 		int on_chunk_header(WWRP<parser> const& p) {
-			//@todo, post chunk
-			(void)p;
 			WAWO_ASSERT(p != NULL);
 			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
 			WAWO_ASSERT(pctx->cur_req_ctx != NULL);
-			pctx->cur_req_ctx->cur_req_in_chunk_body = true;
+			pctx->cur_req_in_chunk_body = true;
+			pctx->cur_req_has_chunk_body = true;
+			pctx->req_body_tmp = wawo::make_ref<wawo::packet>();
 			return wawo::OK;
 		}
 
 		int on_chunk_complete(WWRP<parser> const& p) {
-			(void)p;
 			WAWO_ASSERT(p != NULL);
 			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
 			WAWO_ASSERT(pctx->cur_req_ctx != NULL);
-			WAWO_ASSERT(pctx->cur_req_ctx->cur_req_in_chunk_body == true );
+			WAWO_ASSERT(pctx->cur_req_in_chunk_body == true );
+			WAWO_ASSERT(pctx->req_body_tmp != NULL);
+
+			char hex_string[16] = { 0 };
+			int i = int_to_hex_string(pctx->req_body_tmp->len(), hex_string, 16);
+			pctx->req_body_tmp->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
+			pctx->req_body_tmp->write_left((byte_t*)hex_string, i);
+			pctx->req_body_tmp->write((byte_t*)WAWO_HTTP_CRLF, 2);
+			http_up(pctx,pctx->req_body_tmp);
+			pctx->req_body_tmp = NULL;
+
 			return wawo::OK;
 		}
 	}
@@ -375,16 +374,9 @@ namespace roger {
 			ctx->cur_resp = wawo::make_shared<protocol::http::message>();
 			ctx->cur_resp->type = T_RESP;
 			ctx->resp_in_chunk_body = false;
-
+			ctx->resp_has_chunk_body = false;
+			ctx->resp_cur_body_len = 0;
 			TRACE_HTTP_PROXY("[roger][http][s%u]resp message begin", ctx->ch_stream_ctx->ch->ch_id() );
-			return wawo::OK;
-		}
-
-		int on_url(WWRP<parser> const& p, const char* data, u32_t const& len) {
-			(void)p;
-			(void)data;
-			(void)len;
-			WAWO_ASSERT(!"WHAT");
 			return wawo::OK;
 		}
 
@@ -415,6 +407,7 @@ namespace roger {
 
 			u32_t dlen = wawo::strlen(data);
 			if (dlen < len) {
+				//http_parse sometimes occur in this situation
 				ctx->cur_resp->h.set(ctx->resp_http_field_tmp, std::string(data, dlen));
 				WAWO_WARN("[roger][http][s%u]invalid header value len, try to cut len", ctx->ch_stream_ctx->ch->ch_id() );
 			} else {
@@ -431,8 +424,8 @@ namespace roger {
 			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
 			WAWO_ASSERT(pctx->cur_resp != NULL);
 			WAWO_ASSERT(pctx->parent != NULL);
-			WWRP<proxy_ctx> ppctx = pctx->parent;
 
+			WWRP<proxy_ctx> ppctx = pctx->parent;
 			WAWO_ASSERT(pctx->state == PIPE_DIAL_SERVER_OK);
 	
 			pctx->resp_header_connection_close = false; //default is false
@@ -454,12 +447,13 @@ namespace roger {
 
 			char resp_status[4096] = {0};
 			int nresp = snprintf(resp_status, 4096, "HTTP/%d.%d %u %s\r\n", pctx->cur_resp->ver.major, pctx->cur_resp->ver.minor, pctx->cur_resp->status_code, pctx->cur_resp->status.c_str());
-			WAWO_ASSERT(nresp > 0);
+			WAWO_ASSERT(nresp > 0 && nresp <4096);
 
 			http_reply->write_left((byte_t*)resp_status, nresp);
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 
 			http_down(ppctx, http_reply);
+
 			TRACE_HTTP_PROXY("[roger][http][s%u]resp header complete", pctx->ch_stream_ctx->ch->ch_id() );
 			return wawo::OK ;
 		}
@@ -471,21 +465,16 @@ namespace roger {
 			WAWO_ASSERT(pctx->cur_resp != NULL);
 			WAWO_ASSERT(pctx->parent != NULL);
 			WWRP<proxy_ctx> ppctx = pctx->parent;
-
-			WWRP<packet> http_body = wawo::make_ref<packet>(len);
-			http_body->write((byte_t*)data,len);
-
+			pctx->resp_cur_body_len += len;
 			if (pctx->resp_in_chunk_body) {
-				char hex_string[16] = { 0 };
-				int i = int_to_hex_string(len, hex_string, 16);
-				http_body->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
-				http_body->write_left((byte_t*)hex_string, i);
-				http_body->write((byte_t*)WAWO_HTTP_CRLF, 2);
+				pctx->resp_body_tmp->write((byte_t*)data, len);
+			} else {
+				WWRP<packet> http_body = wawo::make_ref<packet>(len + 2);
+				http_body->write((byte_t*)data, len);
+				http_down(ppctx, http_body);
 			}
 
-			http_down(ppctx, http_body);
-
-			TRACE_HTTP_PROXY("[roger][http][s%u]resp body complete", pctx->ch_stream_ctx->ch->ch_id() );
+			TRACE_HTTP_PROXY("[roger][http][s%u]write body, bytes: %u", pctx->ch_stream_ctx->ch->ch_id(), len );
 			return wawo::OK;
 		}
 
@@ -498,13 +487,11 @@ namespace roger {
 			WAWO_ASSERT(pctx->parent != NULL);
 			WWRP<proxy_ctx> ppctx = pctx->parent;
 
-
-			if (pctx->resp_in_chunk_body) {
-				pctx->resp_in_chunk_body = false;
+			if (pctx->resp_has_chunk_body) {
 				WWRP<packet> http_chunk_body_trailing = wawo::make_ref<packet>();
 				static const char* chunk_trailing = "0\r\n\r\n";
 				http_chunk_body_trailing->write((byte_t*)chunk_trailing, 5);
-				http_down(pctx, http_chunk_body_trailing);
+				http_down(ppctx, http_chunk_body_trailing);
 				TRACE_HTTP_PROXY("[roger][http][s%u]resp message complete, finish last chunk flag", pctx->ch_stream_ctx->ch->ch_id());
 			}
 
@@ -524,17 +511,17 @@ namespace roger {
 				) {
 				/*RFC2518*/
 				WWSP<wawo::net::protocol::http::message> _m = pctx->reqs.front();
-				TRACE_HTTP_PROXY("[roger][s%u]ignore, pop req: %s, for: %u", pctx->ch_stream_ctx->ch->ch_id(), _m->url.c_str(), pctx->cur_resp->status_code);
+				TRACE_HTTP_PROXY("[roger][s%u]http ignore pop req: %s, for: %u", pctx->ch_stream_ctx->ch->ch_id(), _m->url.c_str(), pctx->cur_resp->status_code);
 			}
 			else {
 				WWSP<wawo::net::protocol::http::message> _m = pctx->reqs.front();
-				TRACE_HTTP_PROXY("[roger][s%u]pop req for message complete: %s", pctx->ch_stream_ctx->ch->ch_id(), _m->url.c_str());
+				TRACE_HTTP_PROXY("[roger][s%u][%s]http pop req: %s", pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), _m->url.c_str());
 				pctx->reqs.pop();
 			}
 			pctx->cur_resp = NULL;
 			++pctx->resp_count;
 
-			TRACE_HTTP_PROXY("[roger][http][s%u]resp message complete", pctx->ch_stream_ctx->ch->ch_id());
+			TRACE_HTTP_PROXY("[roger][http][s%u]resp message complete, body len: %u", pctx->ch_stream_ctx->ch->ch_id(), pctx->resp_cur_body_len );
 			return wawo::OK;
 		}
 
@@ -542,13 +529,31 @@ namespace roger {
 			WAWO_ASSERT(p != NULL);
 			WWRP<proxy_ctx> http_ctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
 			http_ctx->resp_in_chunk_body = true;
+			http_ctx->resp_has_chunk_body = true;
+
+			http_ctx->resp_body_tmp = wawo::make_ref<wawo::packet>();
 			return wawo::OK;
 		}
 
 		int on_chunk_complete(WWRP<parser> const& p) {
 			WAWO_ASSERT(p != NULL);
 			WWRP<proxy_ctx> http_ctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
+			WWRP<proxy_ctx> ppctx = http_ctx->parent;
 			WAWO_ASSERT(http_ctx->resp_in_chunk_body == true);
+			WAWO_ASSERT(http_ctx->resp_has_chunk_body == true);
+			http_ctx->resp_in_chunk_body = false;
+
+			if (http_ctx->resp_body_tmp->len()) {
+				char hex_string[16] = { 0 };
+				TRACE_CLIENT_SIDE_CTX("[client]write bytes: %u", http_ctx->resp_body_tmp->len());
+				int i = int_to_hex_string(http_ctx->resp_body_tmp->len(), hex_string, 16);
+				http_ctx->resp_body_tmp->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
+				http_ctx->resp_body_tmp->write_left((byte_t*)hex_string, i);
+				http_ctx->resp_body_tmp->write((byte_t*)WAWO_HTTP_CRLF, 2);
+
+				http_down(ppctx, http_ctx->resp_body_tmp);
+			}
+			http_ctx->resp_body_tmp = NULL;
 			return wawo::OK;
 		}
 	}
