@@ -300,7 +300,7 @@ namespace roger {
 		break;
 		default:
 		{
-			WAWO_ASSERT(!"WHAT, SUB PCTX in invalid state");
+			WAWO_ASSERT(!"http pctx in invalid state");
 		}
 		break;
 		}
@@ -546,7 +546,7 @@ namespace roger {
 
 						WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>(64);
 						resp_connect_result_to_client(pctx, downp, rt);
-						WAWO_WARN("[client][#%u]connect server failed:%d, target addr: %s:%u, force close both channel"
+						WAWO_WARN("[client][#%u]connect server failed:%d, target addr: %s:%u"
 							, pctx->ch_stream_ctx->ch->ch_id(), rt, ::ntohl(pctx->dst_ipv4), pctx->dst_port);
 					}
 				});
@@ -669,7 +669,7 @@ namespace roger {
 			pctx->client_read_closed = false;
 			pctx->stream_read_closed = false;
 			pctx->ch_client_ctx = ctx;
-			pctx->protocol_packet = wawo::make_ref<wawo::packet>(10240);
+			pctx->protocol_packet = wawo::make_ref<wawo::packet>();
 			pctx->type = T_NONE;
 			TRACE_CLIENT_SIDE_CTX("[roger][#%d]client connected", ctx->ch->ch_id());
 		}
@@ -705,9 +705,9 @@ namespace roger {
 		void closed(WWRP<wawo::net::channel_handler_context > const& ctx) {
 			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
 			WAWO_ASSERT(pctx != NULL);
+			WAWO_ASSERT(pctx->client_read_closed == true);
 			ctx->ch->set_ctx(NULL);
 			TRACE_CLIENT_SIDE_CTX("[roger][#%d]client closed", ctx->ch->ch_id());
-			WAWO_ASSERT(pctx->client_read_closed == true);
 		}
 
 		void write_block(WWRP<wawo::net::channel_handler_context> const& ctx) {
@@ -724,25 +724,23 @@ namespace roger {
 			WAWO_ASSERT(pctx != NULL);
 			WAWO_ASSERT(pctx->ch_client_ctx == ctx_);
 
-			bool has_write_to_protocol_packet_already = false;
-
 		_begin_check:
 			switch (pctx->state) {
 			case WAIT_FIRST_PACK:
 			{
+				if (income->len()) {
+					pctx->protocol_packet->write(income->begin(), income->len());
+					income->skip(income->len());
+				}
 				//refer to https://www.ietf.org/rfc/rfc1928.txt
-				pctx->protocol_packet->write(income->begin(), income->len());
-				has_write_to_protocol_packet_already = true;
-
 				if (pctx->protocol_packet->len() < 3) {
-					goto __end_check;
+					goto _end_check;
 				}
 
 				wawo::byte_t v_and_nmethods[2];
 				pctx->protocol_packet->peek(v_and_nmethods, 2);
 
 				if (v_and_nmethods[0] == 0x05) {
-					//socks5
 					pctx->type = T_SOCKS5;
 					pctx->state = SOCKS5_CHECK_AUTH;
 				}
@@ -750,18 +748,16 @@ namespace roger {
 					pctx->type = T_SOCKS4;
 					pctx->state = SOCKS4_PARSE;
 				} else {
-					//try http
-					//ctx->type = T_HTTP;
 					int detect_rt = _detect_http_proxy(pctx);
 					if (detect_rt > 0) {
-						//continue
-						goto __end_check;
+						goto _end_check;
 					}
 					else if (detect_rt < 0) {
 						WAWO_ERR("[client][#%u]unknown proxy type", pctx->ch_client_ctx->ch->ch_id() );
 						pctx->ch_client_ctx->close();
-						goto __end_check;
+						goto _end_check;
 					} else {
+						income->write_left(pctx->protocol_packet->begin(), pctx->protocol_packet->len());
 						pctx->protocol_packet->reset();
 						pctx->state = HTTP_REQ_PARSE;
 						pctx->http_req_parser = roger::make_http_req_parser();
@@ -773,9 +769,9 @@ namespace roger {
 			break;
 			case SOCKS5_CHECK_AUTH:
 			{
-				if (has_write_to_protocol_packet_already == false) {
+				if (income->len()) {
 					pctx->protocol_packet->write(income->begin(), income->len());
-					has_write_to_protocol_packet_already = true;
+					income->reset();
 				}
 				WAWO_ASSERT(pctx->protocol_packet->len() >= 2);
 				wawo::byte_t v_and_nmethods[2];
@@ -794,46 +790,46 @@ namespace roger {
 			break;
 			case SOCKS5_RESP_HANDSHAKE:
 				{
-					if (has_write_to_protocol_packet_already == false) {
+					if (income->len()) {
 						pctx->protocol_packet->write(income->begin(), income->len());
-						has_write_to_protocol_packet_already = true;
-						goto __end_check;
+						income->skip(income->len());
 					}
 				}
 				break;
 			case SOCKS5_CHECK_CMD:
 			{
-				if (has_write_to_protocol_packet_already == false) {
+				if (income->len()) {
 					pctx->protocol_packet->write(income->begin(), income->len());
-					has_write_to_protocol_packet_already = true;
+					income->skip(income->len());
 				}
 				int check_rt = _socks5_check_cmd(pctx);
 				if (check_rt == E_OK) {
-					WAWO_ASSERT(pctx->state == PIPE_PREPARE);
+					pctx->state == PIPE_PREPARE;
 					goto _begin_check;
 				}
+				else if (check_rt < 0) {
+					pctx->ch_client_ctx->close();
+					TRACE_CLIENT_SIDE_CTX("[client][%u]protocol check failed: %d, close client", pctx->ch_client_ctx->ch->ch_id(), check_rt );
+				} else {}
 			}
 			break;//end for SOCKS5_AUTH_DONE
 			case SOCKS4_PARSE:
 			{
-				if (has_write_to_protocol_packet_already == false) {
+				if (income->len()) {
 					pctx->protocol_packet->write(income->begin(), income->len());
-					has_write_to_protocol_packet_already = true;
+					income->skip(income->len());
 				}
 
 				//socks4
 				int parse_rt = _socks4_parse(pctx);
-				if (parse_rt > E_OK) {
-					goto __end_check;
+				if (parse_rt < E_OK) {
+					pctx->ch_client_ctx->close();
+					WAWO_WARN("[roger]parse socks4 protocol failed: %d, close client", parse_rt);
 				}
 				else if (parse_rt == E_OK) {
 					pctx->state = PIPE_PREPARE;
 					goto _begin_check;
-				}
-				else {
-					pctx->ch_client_ctx->close();
-					WAWO_WARN("[roger]parse socks4 protocol failed: %d, close client", parse_rt);
-				}
+				} else {}
 			}
 			break;
 			case PIPE_PREPARE:
@@ -845,7 +841,7 @@ namespace roger {
 						WAWO_WARN("[client][http_proxy][#%u]invalid ipaddr, close cp", pctx->ch_client_ctx->ch->ch_id() );
 						pctx->state = PIPE_DIAL_STREAM_FAILED;
 						pctx->ch_client_ctx->close();
-						goto __end_check;
+						goto _end_check;
 					}
 
 					pctx->address_type = IPV4;
@@ -897,7 +893,6 @@ namespace roger {
 			case PIPE_DIAL_STREAM_OK:
 			{
 				pctx->protocol_packet->write(income->begin(), income->len());
-				goto __end_check;
 			}
 			break;
 			case PIPE_DIALING_SERVER:
@@ -905,7 +900,6 @@ namespace roger {
 				WAWO_ASSERT(pctx->protocol_packet->len() == 0);
 				WAWO_ASSERT(income != NULL);
 				ctx_up(pctx, income,false);
-				goto __end_check;
 			}
 			break;
 			case PIPE_DIAL_SERVER_OK:
@@ -913,7 +907,6 @@ namespace roger {
 				WAWO_ASSERT(pctx->protocol_packet->len() == 0);
 				WAWO_ASSERT(income != NULL);
 				ctx_up(pctx, income);
-				goto __end_check;
 			}
 			break;
 			case HTTP_REQ_PARSE:
@@ -927,10 +920,10 @@ namespace roger {
 
 					bool is_parse_error = (pctx->type == T_HTTPS && pctx->state == PIPE_PREPARE) ? ec != HPE_CB_message_complete : ec != wawo::OK;
 					if (is_parse_error) {
-						pctx->ch_client_ctx->close();
 						pctx->state = HTTP_PARSE_ERROR;
+						pctx->ch_client_ctx->close();
 						WAWO_WARN("[roger][#%u]http request parsed failed: %d", pctx->ch_client_ctx->ch->ch_id(), ec);
-						goto __end_check;
+						goto _end_check;
 					}
 				}//end for __HTTP_PARSE tag
 
@@ -943,13 +936,26 @@ namespace roger {
 			}//end for HTTP_PARSER state
 			break;
 			case PIPE_DIAL_STREAM_FAILED:
+			{
+				WAWO_ASSERT(!"PROTOCOL CHECK LOGIC ISSUE");
+			}
+			break;
 			case PIPE_DIAL_SERVER_FAILED:
 			{
-				WAWO_ASSERT(!"TODO"); //check whether code has been forwarded
+				WAWO_ASSERT(pctx->type != T_HTTP);
+				//ignore this input
+
+				//close flow in this case
+				//client resp error to client's client fd, client's client should action on this error(usually close fd),
+				//client received FIN and forward to rserver, rserver check current state , do stream->close(), stream close would be result a FIN sent to client
+				//client get both side FIN , client close
+				//WAWO_ASSERT(!"TODO"); //check whether code has been forwarded
 			}
 			break;
 			case HTTP_PARSE_ERROR:
-			{}
+			{
+				WAWO_ASSERT(!"HTTP PARSE LOGIC ISSUE");
+			}
 			break;
 			default:
 			{
@@ -958,7 +964,7 @@ namespace roger {
 			break;
 			}
 
-		__end_check:
+		_end_check:
 			(void)1;
 		}
 	};

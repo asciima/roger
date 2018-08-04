@@ -12,7 +12,6 @@ namespace roger {
 		s5_handshake_reply->write<u8_t>(0);
 
 		WWRP<wawo::net::channel_future> write_f = ctx->ch_client_ctx->write(s5_handshake_reply);
-
 		write_f->add_listener([ctx](WWRP<wawo::net::channel_future> const& f) {
 			int rt = f->get();
 			if (rt != wawo::OK) {
@@ -21,9 +20,10 @@ namespace roger {
 			} else {
 				ctx->state = SOCKS5_CHECK_CMD;
 				if (ctx->protocol_packet->len()) {
-					WWRP<wawo::packet> income = wawo::make_ref<wawo::packet>( ctx->protocol_packet->len() );
-					income->write( ctx->protocol_packet->begin(), ctx->protocol_packet->len() );
-					ctx->protocol_packet->reset();
+					WWRP<wawo::packet> income = wawo::make_ref<wawo::packet>();
+					//income->write( ctx->protocol_packet->begin(), ctx->protocol_packet->len() );
+					//ctx->protocol_packet->reset();
+					//fake a new arrive to get a check chance
 					ctx->ch_client_ctx->invoke_read(income);
 				}
 			}
@@ -50,19 +50,12 @@ namespace roger {
 			addr_len = 16;
 			rlen = 4 + addr_len + 2;
 		} else if (((vcra[3])&(0xff)) == ADDR_DOMAIN) {
-			//domain name
-			//first octet is len
-			//todo
-			//addr_len = 0xFF&
-
 			u8_t dlen = vcra[4] & 0xFF;
-
 			//vcra + len + domain
 			rlen = 4 + 1 + dlen;
 			WAWO_DEBUG("[client][#%u]atype(domain): %d", pctx->ch_client_ctx->ch->ch_id() , vcra[3]);
 		}
 		else {
-			pctx->ch_client_ctx->close();
 			WAWO_ERR("[client][#%u:%s]unknown atype: %d", pctx->ch_client_ctx->ch->ch_id(), vcra[3]);
 			return E_SOCKS5_UNKNOWN_ATYPE;
 		}
@@ -88,56 +81,45 @@ namespace roger {
 			if (pctx->dst_ipv4 == 0 || pctx->dst_port == 0)
 			{
 				WAWO_ERR("[client][#%u]invalid addr or port", pctx->ch_client_ctx->ch->ch_id() );
-				pctx->ch_client_ctx->close();
 				return E_SOCKS5_MISSING_IP_OR_PORT;
 			}
 			pctx->address_type = IPV4;
 		}
 		else if (at == ADDR_IPV6) {
-			WAWO_THROW("unsupported dst addr format (ADDR_IPV6)");
+			return E_SOCKS5_UNSUPPORTED_ADDR_TYPE;
 		}
 		else if (at == ADDR_DOMAIN) {
 			u8_t dlen = pctx->protocol_packet->read<u8_t>();
 			if (dlen >= 512) {
 				WAWO_ERR("[client][#%u]invalid domain", pctx->ch_client_ctx->ch->ch_id());
-				pctx->ch_client_ctx->close();
 				return E_SOCKS5_INVALID_DOMAIN;
 			}
 
 			char domain[512] = { 0 };
 			u32_t drlen = pctx->protocol_packet->read((wawo::byte_t*)domain, dlen);
 			WAWO_ASSERT(dlen == drlen);
+			pctx->address_type = HOST;
+
 			pctx->dst_domain = std::string(domain, wawo::strlen(domain));
 			pctx->dst_port = pctx->protocol_packet->read<u16_t>();
-
-			pctx->address_type = HOST;
 
 			WAWO_DEBUG("[client][#%u]CMD: %d, dst addr: %s:%d", pctx->ch_client_ctx->ch->ch_id() , cmd, domain, pctx->dst_port);
 			pctx->dst_ipv4 = 0;
 		}
 		else {
-			WAWO_THROW("unsupported dst addr format(UNKNOWN)");
+			return E_SOCKS5_UNSUPPORTED_ADDR_TYPE;
 		}
 
 		switch (cmd) {
 		case S5C_CONNECT:
 		{
-			pctx->state = PIPE_PREPARE;
 		}
 		break;
 		case S5C_BIND:
-		{
-			WAWO_THROW("unsupported cmd (BIND)");
-		}
-		break;
 		case S5C_UDP_ASSOCIATE:
-		{
-			WAWO_THROW("unsupported cmd (S5C_UDP)");
-		}
-		break;
 		default:
 		{
-			WAWO_THROW("unsupported cmd (UNKNOWN)");
+			return E_SOCKS5_UNSUPPORTED_CMD;
 		}
 		break;
 		}
@@ -284,7 +266,6 @@ namespace roger {
 
 	int _detect_http_proxy(WWRP<proxy_ctx> const& pctx) {
 		byte_t method[WAWO_HTTP_METHOD_NAME_MAX_LEN + 1] = { 0 };
-
 		if (pctx->protocol_packet->len() < WAWO_HTTP_METHOD_NAME_MAX_LEN) {
 			return E_WAIT_BYTES_ARRIVE;
 		}
@@ -300,8 +281,7 @@ namespace roger {
 					pctx->type = T_HTTPS;
 					pctx->sub_state = http_req_sub_state::S_IDLE;
 					return E_OK;
-				}
-				else {
+				} else {
 					pctx->type = T_HTTP;
 					pctx->sub_state = http_req_sub_state::S_IDLE;
 					return E_OK;
