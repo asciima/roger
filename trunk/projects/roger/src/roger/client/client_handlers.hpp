@@ -516,7 +516,7 @@ namespace roger {
 			pctx->ch_client_ctx->event_poller()->execute([pctx,ctx]() {
 
 				WAWO_ASSERT(pctx->state == PIPE_DIAL_STREAM_OK);
-				TRACE_CLIENT_SIDE_CTX("[roger][s%d]stream connected", ctx->ch->ch_id());
+				TRACE_CLIENT_SIDE_CTX("[roger][s%u]stream connected", ctx->ch->ch_id());
 				pctx->ch_stream_ctx = ctx;
 				pctx->state = PIPE_DIALING_SERVER;
 
@@ -533,7 +533,7 @@ namespace roger {
 					}
 				}
 
-				TRACE_CLIENT_SIDE_CTX("[client]connect server: %s:%u", pctx->dst_domain.c_str(), pctx->dst_port);
+				TRACE_CLIENT_SIDE_CTX("[client][s%u]connect server: %s:%u", pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), pctx->dst_port);
 
 				WWRP<wawo::packet> outp = make_packet_CMD_CONNECT(pctx);
 				WWRP<wawo::net::channel_future> f = pctx->ch_stream_ctx->write(outp);

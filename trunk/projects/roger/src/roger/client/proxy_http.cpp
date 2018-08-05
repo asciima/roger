@@ -224,8 +224,6 @@ namespace roger {
 				_pctx->dst_ipv4 = ipv4;
 				_pctx->dst_port = port;
 
-				pctx->cur_req_ctx = _pctx;
-
 				_pctx->resp_in_chunk_body = false;
 				_pctx->resp_header_connection_close = false;
 				_pctx->resp_count = 0;
@@ -233,6 +231,7 @@ namespace roger {
 				_pctx->HP_key = _HP_key;
 				_pctx->cur_req_in_chunk_body = false;
 
+				pctx->cur_req_ctx = _pctx;
 				_pctx->parent = pctx;
 				pctx->http_proxy_ctx_map.insert({ _HP_key, _pctx });
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
@@ -278,7 +277,7 @@ namespace roger {
 
 			WAWO_ASSERT(pctx->client_read_closed == false);
 			pctx->cur_req_ctx->reqs.push(pctx->cur_req);
-			TRACE_HTTP_PROXY("[roger][s%u][%s]http push req, %s", pctx->stream_id, pctx->HP_key.c_str() , pctx->cur_req->url );
+			TRACE_HTTP_PROXY("[roger][s%u][%s]http push req, %s", pctx->cur_req_ctx->stream_id, pctx->cur_req_ctx->HP_key.c_str() , pctx->cur_req->url );
 
 			WWRP<wawo::packet> H;
 			encode_http_header(pctx->cur_req, H);

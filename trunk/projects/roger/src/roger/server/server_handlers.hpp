@@ -247,7 +247,7 @@ namespace roger {
 					fctx->server_read_closed = true;
 					WAWO_ERR("[server][forward_ctx][s%u--%s:%u]dial failed: %d", fctx->ch_stream_ctx->ch->ch_id(), wawo::net::ipv4todotip(fctx->dst_ipv4).c_str(), fctx->dst_port, rt );
 				} else {
-					TRACE_SERVER_SIDE_CTX("[server][forward_ctx][s%u--%s:%u]dial ok", fctx->ch_stream_ctx->ch->ch_id(), wawo::net::ipv4todotip(fctx->dst_ipv4).c_str(), fctx->dst_port );
+					//TRACE_SERVER_SIDE_CTX("[server][forward_ctx][s%u--%s:%u]dial ok", fctx->ch_stream_ctx->ch->ch_id(), wawo::net::ipv4todotip(fctx->dst_ipv4).c_str(), fctx->dst_port );
 					fctx->state = DIAL_SERVER_OK;
 				}
 
