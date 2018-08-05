@@ -422,7 +422,6 @@ namespace roger {
 			WWRP<proxy_ctx> pctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
 			WAWO_ASSERT(pctx->cur_resp != NULL);
 			WAWO_ASSERT(pctx->parent != NULL);
-
 			WWRP<proxy_ctx> ppctx = pctx->parent;
 			WAWO_ASSERT(pctx->state == PIPE_DIAL_SERVER_OK);
 
@@ -434,9 +433,12 @@ namespace roger {
 				* for others , keep-alive
 				*/
 				pctx->resp_header_connection_close = true;
-				//if (pctx->resp_count > 1) {
-				//	pctx->cur_resp->h.set("Connection", "keep-alive");
-				//}
+				if (pctx->resp_count > 1 ) {
+					if( ppctx->http_proxy_ctx_map.size() > 1 || 
+						pctx->reqs.size()>1
+					)
+					pctx->cur_resp->h.set("Connection", "keep-alive");
+				}
 			}
 
 			WWRP<packet> http_reply;
