@@ -22,13 +22,21 @@ int main(int argc, char** argv) {
 	
 	wawo::app App;
 
-	std::vector<wawo::len_cstr> ns;
+	std::vector<std::string> ns;
 #if WAWO_ISWIN
-//	ns.push_back("192.168.0.1");
-	ns.push_back("192.168.1.1");
-//	ns.push_back("192.168.2.1");
-//	ns.push_back("100.64.10.2");
-//	ns.push_back("100.64.10.3");
+	/*
+	std::vector<wawo::net::address> addrs;
+	wawo::env::instance()->get_local_ip_list(addrs);
+	std::for_each(addrs.begin(), addrs.end(), [](wawo::net::address const& addr) {
+		WAWO_INFO("%s", addr.info().c_str());
+	});
+	*/
+	std::vector<wawo::net::address> addrs_dns;
+	wawo::env::instance()->get_local_dns_server_list(addrs_dns);
+
+	std::for_each(addrs_dns.begin(), addrs_dns.end(), [&ns](wawo::net::address const& addr) {
+		ns.push_back(addr.dotip());
+	});
 #endif
 
 	int resolver_init = roger::dns_resolver::instance()->init(ns);

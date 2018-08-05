@@ -21,6 +21,7 @@ namespace roger {
 		}
 
 		WWRP<proxy_ctx> parent;
+		u32_t stream_id;
 		proxy_forward_type type;
 		proxy_state state;
 
@@ -58,14 +59,12 @@ namespace roger {
 		bool resp_header_connection_close;
 		u32_t resp_count;
 		u32_t resp_cur_body_len;
-		WWRP<wawo::packet> resp_body_tmp;
 
 		std::string HP_key; //host and port
 		message_queue reqs;
 		std::queue<WWRP<wawo::packet>> pending_outp;
 
 		std::string http_req_field_tmp;
-		WWRP<wawo::packet> req_body_tmp;
 		bool cur_req_in_chunk_body;
 		bool cur_req_has_chunk_body;
 	};
@@ -559,17 +558,24 @@ namespace roger {
 			pctx->ch_client_ctx->event_poller()->execute([pctx, ctx]() {
 				WAWO_ASSERT(pctx->ch_stream_ctx == ctx);
 				if (pctx->type == T_HTTP) {
-					WAWO_ASSERT(pctx->parent != NULL);
 					WWRP<proxy_ctx> ppctx = pctx->parent;
+					WAWO_ASSERT(ppctx != NULL);
 					WAWO_ASSERT(ppctx->type == T_HTTP);
 					WAWO_ASSERT(pctx->type == T_HTTP);
+					WAWO_ASSERT(pctx->parent != NULL);
 
+					pctx->stream_read_closed = true;
 					roger::cancel_all_ctx_reqs(pctx, CANCEL_CODE_SERVER_NO_RESPONSE);
+
+					pctx->client_read_closed = true;
+					http_up(pctx, NULL);
+
 					WAWO_ASSERT(pctx->reqs.size() == 0);
 					pctx->http_resp_parser->deinit();
 					pctx->http_resp_parser->ctx = NULL;
 					pctx->http_resp_parser = NULL;
 
+					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
 					http_down(ppctx, NULL);
 				} else {
 					TRACE_CLIENT_SIDE_CTX("[roger][s%d]stream read closed, plan ctx_down", ctx->ch->ch_id());
@@ -588,14 +594,14 @@ namespace roger {
 				TRACE_CLIENT_SIDE_CTX("[roger][s%d]stream closed", ctx->ch->ch_id());
 				if (pctx->type == T_HTTP) {
 					WAWO_ASSERT(pctx->parent != NULL);
-					WWRP<proxy_ctx> ppctx = pctx->parent;
-
+					WAWO_ASSERT(pctx->client_read_closed == true);
+					WAWO_ASSERT(pctx->stream_read_closed == true);
 					WAWO_ASSERT(pctx->reqs.size() == 0);
-					WAWO_ASSERT(pctx->http_proxy_ctx_map.size() == 0);
 					WAWO_ASSERT(pctx->http_resp_parser == NULL);
 
-					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
-					//ppctx->ch_client_ctx->close();
+					//only parent has this
+					WAWO_ASSERT(pctx->http_proxy_ctx_map.size() == 0);
+					WAWO_ASSERT(pctx->http_req_parser == NULL);
 				} else {
 					//last time to flush
 					WAWO_ASSERT(pctx->stream_read_closed == true);
@@ -631,6 +637,8 @@ namespace roger {
 					case PIPE_DIAL_SERVER_OK:
 					{
 						if (pctx->type == T_HTTP) {
+							WAWO_ASSERT(pctx->stream_read_closed == false);
+							WAWO_ASSERT(pctx->reqs.size() > 0);
 							//@TODO, for HEP_INVALID_CONSTANT ISSUE, need a investigation
 							int ec = http_parse_down(pctx, income);
 							if (ec != wawo::OK) {
@@ -710,11 +718,22 @@ namespace roger {
 		}
 
 		void write_block(WWRP<wawo::net::channel_handler_context> const& ctx) {
-			WAWO_ASSERT(!"TODO");
+			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
+			//WAWO_ASSERT(pctx->ch_stream_ctx != NULL);
+			//pctx->ch_stream_ctx->ch->end_read();
 		}
 
 		void write_unblock(WWRP<wawo::net::channel_handler_context> const& ctx) {
-			WAWO_ASSERT(!"TODO");
+			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
+			//WAWO_ASSERT(pctx->ch_stream_ctx != NULL);
+			//pctx->ch_stream_ctx->ch->begin_read();
+			if (pctx->type == T_HTTP) {
+				//WAWO_ASSERT(pctx->parent != NULL);
+				http_down(pctx, NULL);
+			}
+			else {
+				ctx_down(pctx, NULL);
+			}
 		}
 
 		void read(WWRP<wawo::net::channel_handler_context> const& ctx_ , WWRP<wawo::packet> const& income) {

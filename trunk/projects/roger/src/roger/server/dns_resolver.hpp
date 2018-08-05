@@ -44,7 +44,7 @@ namespace roger {
 		spin_mutex m_dns_ctx_mutex;
 		struct dns_ctx* m_dns_ctx;
 
-		std::vector<wawo::len_cstr> m_ns;
+		std::vector<std::string> m_ns;
 
 	public:
 		dns_resolver():
@@ -55,8 +55,8 @@ namespace roger {
 
 		~dns_resolver() {}
 
-		int init(std::vector<wawo::len_cstr> const& name_servers) {
-			m_ns = std::vector<wawo::len_cstr>(name_servers.begin(), name_servers.end());
+		int init(std::vector<std::string> const& name_servers) {
+			m_ns = std::vector<std::string>(name_servers.begin(), name_servers.end());
 
 			lock_guard<spin_mutex> lg_ctx(m_dns_ctx_mutex);
 			m_dns_ctx = &dns_defctx;
@@ -70,8 +70,8 @@ namespace roger {
 			}
 			else {
 				dns_reset(m_dns_ctx);
-				std::for_each(m_ns.begin(), m_ns.end(), [&](wawo::len_cstr const& serv ) {
-					dns_add_serv(m_dns_ctx, serv.cstr);
+				std::for_each(m_ns.begin(), m_ns.end(), [&](std::string const& serv ) {
+					dns_add_serv(m_dns_ctx, serv.c_str());
 				});
 			}
 
