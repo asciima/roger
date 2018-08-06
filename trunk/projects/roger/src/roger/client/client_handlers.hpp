@@ -336,19 +336,19 @@ namespace roger {
 		return ec;
 	}
 
-	static inline void cancel_all_ctx_reqs(WWRP<proxy_ctx> const& http_ctx, int const& cancel_code) {
-		while (http_ctx->reqs.size()) {
+	static inline void cancel_all_ctx_reqs(WWRP<proxy_ctx> const& pctx, int const& cancel_code) {
+		while (pctx->reqs.size()) {
 			WAWO_ASSERT(cancel_code >= CANCEL_CODE_CONNECT_HOST_FAILED && cancel_code <= CANCEL_CODE_PROXY_PIPE_ERROR );
 			WAWO_ASSERT(cancel_code < http_request_cancel_code::HTTP_REQUEST_CANCEL_CODE_MAX);
 			WWRP<wawo::packet> http_reply = wawo::make_ref<wawo::packet>();
 			http_reply->write((wawo::byte_t*) HTTP_RESP_ERROR[cancel_code], wawo::strlen(HTTP_RESP_ERROR[cancel_code]));
 
-			WAWO_ASSERT(http_ctx->ch_client_ctx != NULL);
-			http_ctx->ch_client_ctx->write(http_reply);
+			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
+			pctx->ch_client_ctx->write(http_reply);
 
-			WWSP<wawo::net::protocol::http::message>& req = http_ctx->reqs.front();
-			WAWO_INFO("[roger][http][s%u][%s]http cancel req: %s, cancel code: %u", http_ctx->ch_stream_ctx->ch->ch_id(), http_ctx->HP_key.c_str(), req->url.c_str(), cancel_code);
-			http_ctx->reqs.pop();
+			WWSP<wawo::net::protocol::http::message>& req = pctx->reqs.front();
+			WAWO_INFO("[roger][http][s%u][%s]http cancel req: %s, cancel code: %u, total resp count: %u", pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), req->url.c_str(), cancel_code, pctx->resp_count );
+			pctx->reqs.pop();
 		}
 	}
 
@@ -565,6 +565,8 @@ namespace roger {
 					WAWO_ASSERT(pctx->parent != NULL);
 
 					pctx->stream_read_closed = true;
+					//@todo
+					//schedule another req
 					roger::cancel_all_ctx_reqs(pctx, CANCEL_CODE_SERVER_NO_RESPONSE);
 
 					pctx->client_read_closed = true;
