@@ -150,6 +150,8 @@ namespace roger {
 			ipv4_t ipv4 = 0;
 			port_t port = pctx->cur_req->urlfields.port;
 
+			//@refer to https://tools.ietf.org/html/rfc2616: 5.1.2 Request-URI
+			//The absoluteURI form is REQUIRED when the request is being made to a proxy
 			WAWO_ASSERT(domain.length() > 0);
 			WAWO_ASSERT(port > 0);
 
