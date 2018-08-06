@@ -216,6 +216,12 @@ namespace roger {
 	static const char HTTP_RESP_RELAY_SUCCEED[] =
 		"HTTP/1.1 200 Connection established\r\n\r\n";
 
+	static const char HTTP_RESP_BAD_REQUEST[] =
+		"HTTP/1.1 400 Bad request\r\n"
+		"Content-Type: text/plain\r\n"
+		"Connection: close\r\n\r\n"
+		"ROGER: Bad request\r\n";
+
 	static const char HTTP_RESP_CONNECT_HOST_FAILED[] =
 		"HTTP/1.1 504 Connection timeout\r\n"
 		"Content-Type: text/plain\r\n"
@@ -315,6 +321,7 @@ namespace roger {
 
 	enum http_request_cancel_code {
 		CANCEL_CODE_CONNECT_HOST_FAILED=-0,
+		CANCEL_CODE_CLIENT_BAD_REQUEST,
 		CANCEL_CODE_SERVER_NO_RESPONSE,
 		CANCEL_CODE_SERVER_RESPONSE_PARSE_ERROR,
 		CANCEL_CODE_PROXY_PIPE_ERROR,
@@ -323,14 +330,11 @@ namespace roger {
 
 	static const char* HTTP_RESP_ERROR[HTTP_REQUEST_CANCEL_CODE_MAX] =
 	{
+		HTTP_RESP_BAD_REQUEST,
 		HTTP_RESP_CONNECT_HOST_FAILED,
 		HTTP_RESP_SERVER_NO_RESPONSE,
 		HTTP_RESP_SERVER_RESPONSE_PARSED_FAILED,
 		HTTP_RESP_PROXY_PIPE_ERROR
-	};
-
-	enum e_stream_write_flag {
-		STREAM_WRITE_BLOCK = 0x01
 	};
 
 	const static wawo::net::socket_cfg mux_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 128 * 1024,128 * 1024 }, default_keep_alive_vals);

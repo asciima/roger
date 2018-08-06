@@ -453,7 +453,6 @@ namespace roger {
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 
 			http_down(ppctx, H);
-
 			TRACE_HTTP_PROXY("[roger][http][s%u]resp header complete, header:\n%s", pctx->ch_stream_ctx->ch->ch_id(), std::string((char*)H->begin(), H->len()).c_str());
 			return wawo::OK;
 		}
