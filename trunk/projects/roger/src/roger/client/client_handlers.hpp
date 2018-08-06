@@ -59,6 +59,7 @@ namespace roger {
 		bool resp_header_connection_close;
 		u32_t resp_count;
 		u32_t resp_cur_body_len;
+		u32_t resp_expected_len;
 
 		std::string HP_key; //host and port
 		message_queue reqs;
@@ -347,7 +348,7 @@ namespace roger {
 			pctx->ch_client_ctx->write(http_reply);
 
 			WWSP<wawo::net::protocol::http::message>& req = pctx->reqs.front();
-			WAWO_INFO("[roger][http][s%u][%s]http cancel req: %s, cancel code: %u, total resp count: %u", pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), req->url.c_str(), cancel_code, pctx->resp_count );
+			TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]http cancel req, code: %u, total resp count: %u, url: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), cancel_code, pctx->resp_count, req->url.c_str());
 			pctx->reqs.pop();
 		}
 	}
@@ -516,7 +517,7 @@ namespace roger {
 			pctx->ch_client_ctx->event_poller()->execute([pctx,ctx]() {
 
 				WAWO_ASSERT(pctx->state == PIPE_DIAL_STREAM_OK);
-				TRACE_CLIENT_SIDE_CTX("[roger][s%u]stream connected", ctx->ch->ch_id());
+				TRACE_CLIENT_SIDE_CTX("[roger][http][#%u][s%d]stream connected", pctx->ch_client_ctx->ch->ch_id(), ctx->ch->ch_id());
 				pctx->ch_stream_ctx = ctx;
 				pctx->state = PIPE_DIALING_SERVER;
 
@@ -533,7 +534,7 @@ namespace roger {
 					}
 				}
 
-				TRACE_CLIENT_SIDE_CTX("[client][s%u]connect server: %s:%u", pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), pctx->dst_port);
+				TRACE_CLIENT_SIDE_CTX("[client][http][#%u][s%u]connect server: %s:%u",pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), pctx->dst_port);
 
 				WWRP<wawo::packet> outp = make_packet_CMD_CONNECT(pctx);
 				WWRP<wawo::net::channel_future> f = pctx->ch_stream_ctx->write(outp);
@@ -544,8 +545,8 @@ namespace roger {
 
 						WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>(64);
 						resp_connect_result_to_client(pctx, downp, rt);
-						WAWO_WARN("[client][#%u]connect server failed:%d, target addr: %s:%u"
-							, pctx->ch_stream_ctx->ch->ch_id(), rt, ::ntohl(pctx->dst_ipv4), pctx->dst_port);
+						WAWO_WARN("[client][http][#%u][s%u]connect server failed:%d, target addr: %s:%u"
+							, pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), rt, ::ntohl(pctx->dst_ipv4), pctx->dst_port);
 					}
 				});
 			});
@@ -557,6 +558,8 @@ namespace roger {
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 			pctx->ch_client_ctx->event_poller()->execute([pctx, ctx]() {
 				WAWO_ASSERT(pctx->ch_stream_ctx == ctx);
+				TRACE_CLIENT_SIDE_CTX("[roger][#%u][s%u]stream read closed", pctx->ch_client_ctx->ch->ch_id(), ctx->ch->ch_id() );
+
 				if (pctx->type == T_HTTP) {
 					WWRP<proxy_ctx> ppctx = pctx->parent;
 					WAWO_ASSERT(ppctx != NULL);
@@ -578,9 +581,10 @@ namespace roger {
 					pctx->http_resp_parser = NULL;
 
 					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
+
+					TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]erase from ppctx", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
 					http_down(ppctx, NULL);
 				} else {
-					TRACE_CLIENT_SIDE_CTX("[roger][s%d]stream read closed, plan ctx_down", ctx->ch->ch_id());
 					pctx->stream_read_closed = true;
 					ctx_down(pctx, NULL);
 				}
@@ -593,7 +597,7 @@ namespace roger {
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 			pctx->ch_client_ctx->event_poller()->execute([pctx,ctx]() {
 				ctx->ch->set_ctx(NULL);
-				TRACE_CLIENT_SIDE_CTX("[roger][s%d]stream closed", ctx->ch->ch_id());
+				TRACE_CLIENT_SIDE_CTX("[roger][#%u][s%d]stream closed", pctx->ch_client_ctx->ch->ch_id(), ctx->ch->ch_id());
 				if (pctx->type == T_HTTP) {
 					WAWO_ASSERT(pctx->parent != NULL);
 					WAWO_ASSERT(pctx->client_read_closed == true);
@@ -662,7 +666,6 @@ namespace roger {
 		}
 	};
 
-
 	class local_proxy_handler :
 		public wawo::net::channel_inbound_handler_abstract,
 		public wawo::net::channel_activity_handler_abstract
@@ -680,13 +683,13 @@ namespace roger {
 			pctx->ch_client_ctx = ctx;
 			pctx->protocol_packet = wawo::make_ref<wawo::packet>();
 			pctx->type = T_NONE;
-			TRACE_CLIENT_SIDE_CTX("[roger][#%d]client connected", ctx->ch->ch_id());
+			TRACE_CLIENT_SIDE_CTX("[roger][#%u]client connected", ctx->ch->ch_id());
 		}
 
 		void read_shutdowned(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
 			WAWO_ASSERT(pctx != NULL);
-			TRACE_CLIENT_SIDE_CTX("[roger][#%d]client read closed", ctx->ch->ch_id());
+			TRACE_CLIENT_SIDE_CTX("[roger][#%u]client read closed", ctx->ch->ch_id());
 			pctx->client_read_closed = true;
 
 			if (pctx->http_req_parser != NULL) {
@@ -716,7 +719,7 @@ namespace roger {
 			WAWO_ASSERT(pctx != NULL);
 			WAWO_ASSERT(pctx->client_read_closed == true);
 			ctx->ch->set_ctx(NULL);
-			TRACE_CLIENT_SIDE_CTX("[roger][#%d]client closed", ctx->ch->ch_id());
+			TRACE_CLIENT_SIDE_CTX("[roger][#%u]client closed", ctx->ch->ch_id());
 		}
 
 		void write_block(WWRP<wawo::net::channel_handler_context> const& ctx) {

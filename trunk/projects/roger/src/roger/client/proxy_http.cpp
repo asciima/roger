@@ -88,7 +88,7 @@ namespace roger {
 			WAWO_ASSERT(pctx->cur_req == NULL);
 			pctx->cur_req = wawo::make_shared<protocol::http::message>();
 			pctx->cur_req->type = T_REQ;
-			pctx->cur_req->is_header_contain_connection_close = false;
+//			pctx->cur_req->is_header_contain_connection_close = false;
 
 			pctx->cur_req_has_chunk_body = false;
 			pctx->cur_req_in_chunk_body = false;
@@ -117,17 +117,6 @@ namespace roger {
 			return wawo::OK;
 		}
 
-		/*
-		int on_status(WWRP<parser> const& p, const char* data, u32_t const& len) {
-			WAWO_ASSERT(!"what, http request message should not have this header line");
-
-			(void)p;
-			(void)data;
-			(void)len;
-
-			return wawo::OK;
-		}
-		*/
 		int on_header_field(WWRP<parser> const& p, const char* data, u32_t const& len) {
 			WAWO_ASSERT(p->ctx != NULL);
 
@@ -192,11 +181,13 @@ namespace roger {
 			pctx->cur_req->h.remove("Proxy-Connection");
 			pctx->cur_req->h.remove("proxy-connection");
 
+			/*
 			if (pctx->cur_req->h.get("Connection") == "close" ||
 				pctx->cur_req->h.get("connection") == "close"
 				) {
 				pctx->cur_req->is_header_contain_connection_close = true;
 			}
+			*/
 
 			std::string _HP_key = domain + ":"+ std::to_string(port);
 			stream_http_proxy_ctx_map_t::iterator it = pctx->http_proxy_ctx_map.find(_HP_key);
@@ -234,6 +225,8 @@ namespace roger {
 				pctx->cur_req_ctx = _pctx;
 				_pctx->parent = pctx;
 				pctx->http_proxy_ctx_map.insert({ _HP_key, _pctx });
+
+
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
 				wawo::net::handler::mux_stream_id_t sid = wawo::net::handler::mux_make_stream_id();
 
@@ -242,6 +235,8 @@ namespace roger {
 				WAWO_ASSERT(ec == wawo::OK);
 				_pctx->stream_id = sid;
 				WWRP<wawo::net::channel_promise> dial_f = muxs->make_promise();
+
+				TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]insert into ppctx", pctx->ch_client_ctx->ch->ch_id(), _pctx->stream_id, pctx->HP_key.c_str());
 
 				dial_f->add_listener([_HP_key,sid,_pctx,pctx](WWRP<wawo::net::channel_future> const& f) {
 					int rt = f->get();
@@ -277,11 +272,12 @@ namespace roger {
 
 			WAWO_ASSERT(pctx->client_read_closed == false);
 			pctx->cur_req_ctx->reqs.push(pctx->cur_req);
-			TRACE_HTTP_PROXY("[roger][s%u][%s]http push req, %s", pctx->cur_req_ctx->stream_id, pctx->cur_req_ctx->HP_key.c_str() , pctx->cur_req->url );
 
 			WWRP<wawo::packet> H;
 			encode_http_header(pctx->cur_req, H);
 			http_up(pctx->cur_req_ctx, H);
+
+			TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]push req, %s, header: \n%s", pctx->ch_client_ctx->ch->ch_id(), pctx->cur_req_ctx->stream_id, pctx->cur_req_ctx->HP_key.c_str(), pctx->cur_req->url.c_str(), std::string((char*)H->begin(),H->len()).c_str() );
 			return wawo::OK;
 		}
 
@@ -329,11 +325,11 @@ namespace roger {
 					http_up(pctx->cur_req_ctx, chunk_trailing);
 				}
 
-				if (pctx->cur_req->is_header_contain_connection_close == true) {
+				//if (pctx->cur_req->is_header_contain_connection_close == true) {
 					//we'll erase this pair when stream closed
-					pctx->cur_req_ctx->client_read_closed = true;
-					http_up(pctx->cur_req_ctx, NULL);
-				}
+					//pctx->cur_req_ctx->client_read_closed = true;
+					//http_up(pctx->cur_req_ctx, NULL);
+				//}
 			}
 			pctx->cur_req_ctx = NULL;
 			pctx->cur_req = NULL;
@@ -361,7 +357,8 @@ namespace roger {
 	}
 
 	namespace http_resp {
-
+		//impl note:
+		//1, TE not supported for now
 		int on_message_begin(WWRP<parser> const& p) {
 			WAWO_ASSERT(p->ctx != NULL);
 			WWRP<proxy_ctx> ctx = wawo::static_pointer_cast<proxy_ctx>(p->ctx);
@@ -372,6 +369,7 @@ namespace roger {
 			ctx->resp_in_chunk_body = false;
 			ctx->resp_has_chunk_body = false;
 			ctx->resp_cur_body_len = 0;
+			ctx->resp_expected_len = 0;
 			TRACE_HTTP_PROXY("[roger][http][s%u]resp message begin", ctx->ch_stream_ctx->ch->ch_id());
 			return wawo::OK;
 		}
@@ -440,19 +438,23 @@ namespace roger {
 				}
 			}
 
-			WWRP<packet> http_reply;
-			pctx->cur_resp->h.encode(http_reply);
+			if (pctx->cur_resp->h.have("Content-Length")) {
+				pctx->resp_expected_len = wawo::to_u32(pctx->cur_resp->h.get("Content-Length").c_str());
+			}
+
+			WWRP<packet> H;
+			pctx->cur_resp->h.encode(H);
 
 			char resp_status[4096] = { 0 };
 			int nresp = snprintf(resp_status, 4096, "HTTP/%d.%d %u %s\r\n", pctx->cur_resp->ver.major, pctx->cur_resp->ver.minor, pctx->cur_resp->status_code, pctx->cur_resp->status.c_str());
 			WAWO_ASSERT(nresp > 0 && nresp < 4096);
 
-			http_reply->write_left((byte_t*)resp_status, nresp);
+			H->write_left((byte_t*)resp_status, nresp);
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 
-			http_down(ppctx, http_reply);
+			http_down(ppctx, H);
 
-			TRACE_HTTP_PROXY("[roger][http][s%u]resp header complete", pctx->ch_stream_ctx->ch->ch_id());
+			TRACE_HTTP_PROXY("[roger][http][s%u]resp header complete, header:\n%s", pctx->ch_stream_ctx->ch->ch_id(), std::string((char*)H->begin(), H->len()).c_str());
 			return wawo::OK;
 		}
 
@@ -464,7 +466,7 @@ namespace roger {
 			WAWO_ASSERT(pctx->parent != NULL);
 			WWRP<proxy_ctx> ppctx = pctx->parent;
 			pctx->resp_cur_body_len += len;
-
+			WAWO_ASSERT( pctx->resp_expected_len >0 ? pctx->resp_expected_len>=pctx->resp_cur_body_len: true);
 			WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>(len + 2);
 			downp->write((byte_t*)data, len);
 
@@ -478,7 +480,7 @@ namespace roger {
 			}
 
 			http_down(ppctx, downp);
-			TRACE_HTTP_PROXY("[roger][http][s%u]write body, bytes: %u", pctx->ch_stream_ctx->ch->ch_id(), len);
+			TRACE_HTTP_PROXY("[roger][http][s%u]write body, bytes: %u, total: %u", pctx->ch_stream_ctx->ch->ch_id(), len, pctx->resp_cur_body_len );
 			return wawo::OK;
 		}
 
@@ -506,11 +508,21 @@ namespace roger {
 				) {
 				/*RFC2518*/
 				WWSP<wawo::net::protocol::http::message> _m = pctx->reqs.front();
-				TRACE_HTTP_PROXY("[roger][s%u]http ignore pop req: %s, for: %u", pctx->ch_stream_ctx->ch->ch_id(), _m->url.c_str(), pctx->cur_resp->status_code);
+				TRACE_HTTP_PROXY("[roger][http][#%u][s%u]ignore pop req: %s, for: %u", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), _m->url.c_str(), pctx->cur_resp->status_code);
 			}
 			else {
+
 				WWSP<wawo::net::protocol::http::message> _m = pctx->reqs.front();
-				TRACE_HTTP_PROXY("[roger][s%u][%s]http pop req: %s", pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), _m->url.c_str());
+				if( _m->h.get("Connection") == "close" || 
+					_m->h.get("connection") == "close") {
+					WAWO_ASSERT(pctx->reqs.size() == 1);
+
+					pctx->client_read_closed = true;
+					http_up(pctx, NULL);
+					TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]req reach 0 and get connection close req: %s, set client read closed", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), _m->url.c_str());
+				}
+
+				TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]pop req: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), _m->url.c_str());
 				pctx->reqs.pop();
 			}
 
