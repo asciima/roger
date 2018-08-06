@@ -389,7 +389,7 @@ namespace roger {
 
 				u8_t cmd = fctx->client_up_first_packet->read<u8_t>();
 				if (cmd != C_CONNECT) {
-					WAWO_ERR("[server][s%u]unknown command: %u", ctx->ch->ch_id(), cmd);
+					WAWO_ERR("[server][s%u] command: %u", ctx->ch->ch_id(), cmd);
 					fctx->server_read_closed = true;
 					WWRP<wawo::packet> outp = wawo::make_ref<wawo::packet>();
 					outp->write<int32_t>(roger::E_UNKNOWN_CMD);
@@ -486,6 +486,7 @@ namespace roger {
 			case DIAL_SERVER_FAILED:
 			case LOOKUP_SERVER_NAEM_FAILED:
 			{
+				TRACE_SERVER_SIDE_CTX("[server][s%u][%s]error state, close stream", fctx->ch_stream_ctx->ch->ch_id(), server_state_str[fctx->state]);
 				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
 				fctx->ch_stream_ctx->close();
 			}
