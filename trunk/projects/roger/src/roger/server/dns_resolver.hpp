@@ -26,22 +26,11 @@ namespace roger {
 		struct dns_query* dnsquery;
 	};
 
-	class dns_resolver;
-	/*
-	struct dns_async_cookie:
-		public wawo::ref_base
-	{
-		dns_resolver* dnsr;
-	};
-	*/
-
 	class dns_resolver:
 		public singleton<dns_resolver>
 	{
+		spin_mutex m_mutex;
 		WWRP<wawo::net::socket> m_so;
-		WWSP<fn_ticker> m_dns_ticker;
-
-		spin_mutex m_dns_ctx_mutex;
 		struct dns_ctx* m_dns_ctx;
 
 		std::vector<std::string> m_ns;
@@ -56,9 +45,8 @@ namespace roger {
 		~dns_resolver() {}
 
 		int init(std::vector<std::string> const& name_servers) {
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			m_ns = std::vector<std::string>(name_servers.begin(), name_servers.end());
-
-			lock_guard<spin_mutex> lg_ctx(m_dns_ctx_mutex);
 			m_dns_ctx = &dns_defctx;
 
 			if (m_ns.size() == 0) {
@@ -91,10 +79,8 @@ namespace roger {
 				return nonblocking;
 			}
 
-			m_dns_ticker = wawo::make_shared<fn_ticker>(std::bind(&dns_resolver::dns_timeout_ticker, this));
-			milli_ticker::instance()->schedule(m_dns_ticker);
-
-			//so->event_poller()->start_timer();
+			WWRP<wawo::timer> t = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(1), WWRP<ref_base>(NULL), &dns_resolver::dns_timeout_ticker, this);
+			so->event_poller()->start_timer(t);
 
 			so->begin_read(F_WATCH_READ_INFINITE, std::bind(&dns_resolver::async_read_dns_reply, this, std::placeholders::_1));
 			m_so = so;
@@ -102,23 +88,25 @@ namespace roger {
 		}
 
 		void deinit() {
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			m_so->ch_close();
-
-			milli_ticker::instance()->deschedule(m_dns_ticker);
-			m_dns_ticker = NULL;
-
 			dns_close(m_dns_ctx);
 			m_dns_ctx = NULL;
 		}
 
-		void dns_timeout_ticker() {
-			//time_t now = ::time(NULL);
-			lock_guard<spin_mutex> lg_ctx(m_dns_ctx_mutex);
+		void dns_timeout_ticker( WWRP<wawo::timer> const& t, WWRP<ref_base> const& cookie ) {
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
+			if (m_dns_ctx == NULL) {
+				return;
+			}
+
 			dns_timeouts(m_dns_ctx, -1, 0);
+			m_so->event_poller()->start_timer(t);
+			(void)cookie;
 		}
 
 		void dns_event_loop() {
-			lock_guard<spin_mutex> lg_ctx(m_dns_ctx_mutex);
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			time_t now = ::time(NULL);
 			dns_ioevent(m_dns_ctx, now);
 		}
@@ -131,14 +119,6 @@ namespace roger {
 				m_so->ch_close();
 			}
 		}
-
-		/*
-		static void async_read_dns_error(int const& code, WWRP<ref_base> const& cookie_) {
-			WAWO_ERR("[dns_resolver]async_read_dns_error: %d", code);
-			WAWO_ASSERT(!"WHAT");
-
-			(void)cookie_;
-		}*/
 
 		static void dns_query_v4_cb(struct dns_ctx* ctx, struct dns_rr_a4* result, void* data) {
 			WAWO_ASSERT(ctx != NULL);
@@ -180,14 +160,13 @@ namespace roger {
 			_cookie->error = error;
 
 			WWRP<async_dns_query> query = wawo::make_ref<async_dns_query>();
-			lock_guard<spin_mutex> lg_ctx(m_dns_ctx_mutex);
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			query->dnsquery = dns_submit_a4(m_dns_ctx, domain.c_str(), 0, dns_resolver::dns_query_v4_cb, (void*)_cookie);
-
 			return query;
 		}
 
 		void resolve_cancel(WWRP<async_dns_query> const& q) {
-			lock_guard<spin_mutex> lg_ctx(m_dns_ctx_mutex);
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			if (q->dnsquery != NULL) {
 				dns_cancel(m_dns_ctx, q->dnsquery);
 				dns_free_ptr(q->dnsquery);
