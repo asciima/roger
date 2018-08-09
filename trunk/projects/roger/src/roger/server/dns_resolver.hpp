@@ -79,7 +79,7 @@ namespace roger {
 				return nonblocking;
 			}
 
-			WWRP<wawo::timer> t = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(1), WWRP<ref_base>(NULL), &dns_resolver::dns_timeout_ticker, this);
+			WWRP<wawo::timer> t = wawo::make_ref<wawo::timer>(std::chrono::seconds(1), WWRP<ref_base>(NULL), &dns_resolver::dns_timeout_ticker, this);
 			so->event_poller()->start_timer(t);
 
 			so->begin_read(F_WATCH_READ_INFINITE, std::bind(&dns_resolver::async_read_dns_reply, this, std::placeholders::_1));
