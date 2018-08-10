@@ -124,7 +124,7 @@ namespace roger {
 			break;
 			default:
 			{
-				DEBUG_STREAM("[client][%s]cancel dialing stream", proxy_state_str[ctx->state]);
+				WAWO_TRACE_STREAM("[client][%s]cancel dialing stream", proxy_state_str[ctx->state]);
 				WAWO_ASSERT(ctx->ch_stream_ctx == NULL);
 				ctx->ch_client_ctx->close();
 			}
