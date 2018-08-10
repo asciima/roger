@@ -33,10 +33,13 @@ namespace roger {
 		WWRP<wawo::net::socket> m_so;
 		struct dns_ctx* m_dns_ctx;
 		std::vector<std::string> m_ns;
+		WWRP<wawo::timer> m_timer;
+		bool m_has_timer;
 	public:
 		dns_resolver():
 			m_so(NULL),
-			m_dns_ctx(NULL)
+			m_dns_ctx(NULL),
+			m_has_timer(false)
 		{
 		}
 
@@ -77,9 +80,7 @@ namespace roger {
 				return nonblocking;
 			}
 
-			WWRP<wawo::timer> t = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(1), WWRP<ref_base>(NULL), &dns_resolver::dns_timeout_ticker, this);
-			so->event_poller()->start_timer(t);
-
+			m_timer = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(200), WWRP<ref_base>(NULL), &dns_resolver::cb_dns_timeout, this);
 			so->begin_read(F_WATCH_READ_INFINITE, std::bind(&dns_resolver::async_read_dns_reply, this, std::placeholders::_1));
 			m_so = so;
 			return wawo::OK;
@@ -92,26 +93,25 @@ namespace roger {
 			m_dns_ctx = NULL;
 		}
 
-		void dns_timeout_ticker( WWRP<wawo::timer> const& t, WWRP<ref_base> const& cookie ) {
+		void cb_dns_timeout( WWRP<wawo::timer> const& t, WWRP<ref_base> const& cookie ) {
 			lock_guard<spin_mutex> lg_ctx(m_mutex);
+			WAWO_ASSERT(m_has_timer == true);
 			if (m_dns_ctx == NULL) {
 				return;
 			}
-
 			dns_timeouts(m_dns_ctx, -1, 0);
+			if (dns_active(m_dns_ctx)==0) {
+				m_has_timer = false;
+				return;
+			}
 			m_so->event_poller()->start_timer(t);
 			(void)cookie;
 		}
 
-		void dns_event_loop() {
-			lock_guard<spin_mutex> lg_ctx(m_mutex);
-			time_t now = ::time(NULL);
-			dns_ioevent(m_dns_ctx, now);
-		}
-
 		void async_read_dns_reply(async_io_result const& r) {
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			if (r.v.code == wawo::OK) {
-				dns_event_loop();
+				dns_ioevent(m_dns_ctx, 0);
 			} else {
 				WAWO_ERR("[dns_resolver]dns read error: %d", r.v.code );
 				m_so->ch_close();
@@ -160,6 +160,11 @@ namespace roger {
 			WWRP<async_dns_query> query = wawo::make_ref<async_dns_query>();
 			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			query->dnsquery = dns_submit_a4(m_dns_ctx, domain.c_str(), 0, dns_resolver::dns_query_v4_cb, (void*)_cookie);
+			dns_timeouts(m_dns_ctx, -1, 0);
+			if (!m_has_timer) {
+				m_has_timer = true;
+				m_so->event_poller()->start_timer(m_timer);
+			}
 			return query;
 		}
 
@@ -171,7 +176,6 @@ namespace roger {
 			}
 		}
 	};
-
 }
 
 #endif

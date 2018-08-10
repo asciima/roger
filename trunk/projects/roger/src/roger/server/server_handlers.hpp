@@ -306,8 +306,7 @@ namespace roger {
 
 		if (ipv4 == 0) {
 			dns_resolve_error(roger::E_DNSLOOKUP_RETURN_NO_IP, cookie_);
-		}
-		else {
+		} else {
 			fctx->ch_stream_ctx->event_poller()->execute([fctx, ipv4]() {
 				fctx->ts_dns_lookup_done = wawo::time::curr_microseconds();
 				WAWO_ASSERT(fctx->query != NULL);
@@ -452,6 +451,14 @@ namespace roger {
 						return;
 					}
 					fctx->dst_ipv4 = fctx->client_up_first_packet->read<wawo::net::ipv4_t>();
+					if (fctx->dst_ipv4 == 0) {
+						WAWO_ERR("[server][s%u]ipv4==0, close", ctx->ch->ch_id());
+						fctx->server_read_closed = true;
+						WWRP<wawo::packet> outp = wawo::make_ref<wawo::packet>();
+						outp->write<int32_t>(roger::E_INVALID_IPV4);
+						flush_down(fctx, outp);
+						return;
+					}
 
 					WAWO_ASSERT(fctx->ch_server_ctx == NULL);
 					WAWO_ASSERT(fctx->up_to_server_packets.size() == 0);

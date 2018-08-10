@@ -210,7 +210,8 @@ namespace roger {
 	enum server_error_code {
 		E_UNKNOWN_CMD = -40001,
 		E_INVALID_DOMAIN = -40002,
-		E_DNSLOOKUP_RETURN_NO_IP = -40003,
+		E_INVALID_IPV4 = -40003,
+		E_DNSLOOKUP_RETURN_NO_IP = -40004
 	};
 
 	static const char HTTP_RESP_RELAY_SUCCEED[] =

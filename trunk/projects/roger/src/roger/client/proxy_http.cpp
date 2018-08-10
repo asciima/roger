@@ -88,7 +88,6 @@ namespace roger {
 			WAWO_ASSERT(pctx->cur_req == NULL);
 			pctx->cur_req = wawo::make_shared<protocol::http::message>();
 			pctx->cur_req->type = T_REQ;
-//			pctx->cur_req->is_header_contain_connection_close = false;
 
 			pctx->cur_req_has_chunk_body = false;
 			pctx->cur_req_in_chunk_body = false;
@@ -105,11 +104,14 @@ namespace roger {
 			pctx->cur_req->url = std::string(data, len);
 
 			int parsert = protocol::http::parse_url(pctx->cur_req->url, pctx->cur_req->urlfields, p->opt == O_CONNECT);
-			WAWO_RETURN_V_IF_NOT_MATCH(parsert, parsert == wawo::OK);
+			if (parsert != wawo::OK) {
+				WAWO_ERR("[roger][#%u]req url parsed failed: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->cur_req->url.c_str() );
+				return parsert;
+			}
 
 			//@TODO
 			//check url:https://tools.ietf.org/html/rfc2616#page-128 to process a empty host string
-			if( pctx->cur_req->urlfields.host.length() == 0 ){
+			if( pctx->cur_req->urlfields.host.length() == 0 ) {
 				WAWO_WARN("opt: %s, data: %s", wawo::net::protocol::http::option_name[pctx->cur_req->opt], data);
 			}
 
@@ -146,30 +148,34 @@ namespace roger {
 			pctx->cur_req->ver = p->ver;
 
 			roger_connect_address_type address_type = HOST;
-			std::string domain = pctx->cur_req->urlfields.host;
+			std::string host = pctx->cur_req->urlfields.host;
 			ipv4_t ipv4 = 0;
 			port_t port = pctx->cur_req->urlfields.port;
 
 			//@refer to https://tools.ietf.org/html/rfc2616: 5.1.2 Request-URI
 			//The absoluteURI form is REQUIRED when the request is being made to a proxy
-			WAWO_ASSERT(domain.length() > 0);
+			WAWO_ASSERT(host.length() > 0);
 			WAWO_ASSERT(port > 0);
 
-			if (domain.length() >= 512) {
-				WAWO_ERR("[roger][s%u]invalid url: %s, len exceed 512", domain.c_str());
+			if (host.length() >= 512) {
+				WAWO_ERR("[roger][#%u]host len exceed 512, host: %s", pctx->ch_client_ctx->ch->ch_id(), host.c_str());
 				//invalid http url host
 				return WAWO_NEGATIVE(HPE_INVALID_URL);
 			}
 
 			//adjust for xx.xx.xx.xx
-			if (wawo::net::is_dotipv4_decimal_notation(domain.c_str())) {
-				wawo::net::dotiptoip(domain.c_str(), ipv4);
+			if (wawo::net::is_dotipv4_decimal_notation(host.c_str())) {
+				wawo::net::dotiptoip(host.c_str(), ipv4);
 				address_type = IPV4;
+				if (ipv4 == 0) {
+					WAWO_ERR("[roger][#%u]invalid host: %s", pctx->ch_client_ctx->ch->ch_id(), host.c_str());
+					return WAWO_NEGATIVE(HPE_INVALID_URL);
+				}
 			}
 
 			if (pctx->type == T_HTTPS) {
 				pctx->address_type = address_type;
-				pctx->dst_domain = domain;
+				pctx->dst_domain = host;
 				pctx->dst_ipv4 = ipv4;
 				pctx->dst_port = port;
 				//for https connection, one client one mux stream
@@ -183,15 +189,7 @@ namespace roger {
 			pctx->cur_req->h.remove("Proxy-Connection");
 			pctx->cur_req->h.remove("proxy-connection");
 
-			/*
-			if (pctx->cur_req->h.get("Connection") == "close" ||
-				pctx->cur_req->h.get("connection") == "close"
-				) {
-				pctx->cur_req->is_header_contain_connection_close = true;
-			}
-			*/
-
-			std::string _HP_key = domain + ":"+ std::to_string(port);
+			std::string _HP_key = host + ":"+ std::to_string(port);
 			stream_http_proxy_ctx_map_t::iterator it = pctx->http_proxy_ctx_map.find(_HP_key);
 
 			if (it != pctx->http_proxy_ctx_map.end() ) {
@@ -213,7 +211,7 @@ namespace roger {
 				_pctx->ch_client_ctx = pctx->ch_client_ctx;
 
 				_pctx->address_type = address_type;
-				_pctx->dst_domain = domain;
+				_pctx->dst_domain = host;
 				_pctx->dst_ipv4 = ipv4;
 				_pctx->dst_port = port;
 
@@ -326,12 +324,6 @@ namespace roger {
 					chunk_trailing->write((byte_t*)chunk_body_trailing, 5);
 					http_up(pctx->cur_req_ctx, chunk_trailing);
 				}
-
-				//if (pctx->cur_req->is_header_contain_connection_close == true) {
-					//we'll erase this pair when stream closed
-					//pctx->cur_req_ctx->client_read_closed = true;
-					//http_up(pctx->cur_req_ctx, NULL);
-				//}
 			}
 			pctx->cur_req_ctx = NULL;
 			pctx->cur_req = NULL;

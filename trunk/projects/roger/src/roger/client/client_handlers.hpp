@@ -74,6 +74,7 @@ namespace roger {
 		WWRP<wawo::packet> outp = wawo::make_ref<wawo::packet>();
 		WAWO_ASSERT(pctx->dst_port > 0);
 		if (pctx->address_type == IPV4) {
+			WAWO_ASSERT(pctx->dst_ipv4 != 0);
 			outp->write<u8_t>(C_CONNECT);
 			outp->write<u16_t>(pctx->dst_port);
 			outp->write<u8_t>(IPV4);
