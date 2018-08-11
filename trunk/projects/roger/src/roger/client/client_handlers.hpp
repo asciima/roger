@@ -97,8 +97,7 @@ namespace roger {
 		switch (ctx->state) {
 			case PIPE_DIALING_STREAM:
 			case PIPE_DIAL_STREAM_OK:
-			{
-				WAWO_ASSERT(!"PROXY STATE LOGIC ISSUE");
+			{//WAIT DIALING STREA RESULT, OR WAIT DIAL_SERVER RESULT
 			}
 			break;
 			case PIPE_DIALING_SERVER:
@@ -561,14 +560,21 @@ namespace roger {
 				WWRP<wawo::packet> outp = make_packet_CMD_CONNECT(pctx);
 				WWRP<wawo::net::channel_future> f = pctx->ch_stream_ctx->write(outp);
 				f->add_listener([pctx](WWRP<wawo::net::channel_future> const& f) {
-					int rt = f->get();
-					if (rt != wawo::OK) {
+					int code = f->get();
+					if (code != wawo::OK) {
 						pctx->state = PIPE_DIAL_SERVER_FAILED;
-
 						WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>(64);
-						resp_connect_result_to_client(pctx, downp, rt);
-						WAWO_WARN("[client][http][#%u][s%u]connect server failed:%d, target addr: %s:%u"
-							, pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), rt, ::ntohl(pctx->dst_ipv4), pctx->dst_port);
+						resp_connect_result_to_client(pctx, downp, code);
+
+						//in case client read closed first
+						if (pctx->client_read_closed == true) {
+							if (pctx->type == T_HTTP) {
+								http_up(pctx, NULL);
+							} else {
+								ctx_up(pctx, NULL);
+							}
+						}
+						WAWO_WARN("[client][#%u][s%u][%s][%s:%u]send connect cmd failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(),::ntohl(pctx->dst_ipv4), pctx->dst_port, code);
 					}
 				});
 			});
@@ -651,15 +657,22 @@ namespace roger {
 						int32_t code = income->read<int32_t>();
 						if (WAWO_LIKELY(code == wawo::OK)) {
 							pctx->state = PIPE_DIAL_SERVER_OK;
-
 							if (pctx->type == T_HTTP) {
 								http_up(pctx, NULL);
-							}
-							else {
+							} else {
 								ctx_up(pctx, NULL);
 							}
 						} else {
+							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]connect failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), ::ntohl(pctx->dst_ipv4), pctx->dst_port, code );
 							pctx->state = PIPE_DIAL_SERVER_FAILED;
+							if (pctx->client_read_closed == true) {
+								if (pctx->type == T_HTTP) {
+									http_up(pctx, NULL);
+								}
+								else {
+									ctx_up(pctx, NULL);
+								}
+							}
 						}
 						resp_connect_result_to_client(pctx, income, code);
 					}
