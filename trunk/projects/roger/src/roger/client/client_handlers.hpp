@@ -574,7 +574,7 @@ namespace roger {
 								ctx_up(pctx, NULL);
 							}
 						}
-						WAWO_WARN("[client][#%u][s%u][%s][%s:%u]send connect cmd failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(),::ntohl(pctx->dst_ipv4), pctx->dst_port, code);
+						WAWO_WARN("[client][#%u][s%u][%s][%s:%u]send connect cmd failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code);
 					}
 				});
 			});
@@ -663,7 +663,7 @@ namespace roger {
 								ctx_up(pctx, NULL);
 							}
 						} else {
-							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]connect failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), ::ntohl(pctx->dst_ipv4), pctx->dst_port, code );
+							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]connect failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code );
 							pctx->state = PIPE_DIAL_SERVER_FAILED;
 							if (pctx->client_read_closed == true) {
 								if (pctx->type == T_HTTP) {
