@@ -283,6 +283,8 @@ namespace roger {
 					fctx->query = dns_resolver::instance()->async_resolve(fctx->dst_domain, fctx, &roger::dns_resolve_success, &roger::dns_resolve_error);
 					++fctx->dns_try_time;
 				});
+
+			fctx->ch_stream_ctx->event_poller()->start_timer(retry_timer);
 			return;
 		}
 
