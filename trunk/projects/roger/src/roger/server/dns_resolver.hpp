@@ -126,8 +126,10 @@ namespace roger {
 			if (result == NULL) {
 				int code = dns_status(ctx);
 				WAWO_ASSERT(code != wawo::OK);
+				WAWO_ASSERT(code >= dns_status::DNS_E_BADQUERY && code <= dns_status::DNS_E_TEMPFAIL);
+				int newcode = dns_error_map[WAWO_ABS(code)];
 				WAWO_ERR("[dns_resolver]dns resolve failed: %d:%s", code, dns_strerror(code));
-				cookie->error(WAWO_NEGATIVE(code), cookie->user_cookie);
+				cookie->error(newcode, cookie->user_cookie);
 				WAWO_DELETE(cookie);
 				return;
 			}
@@ -165,6 +167,7 @@ namespace roger {
 				m_has_timer = true;
 				m_so->event_poller()->start_timer(m_timer);
 			}
+			TRACE_DNS("[dns_resolve]async resolve: %s", domain.c_str() );
 			return query;
 		}
 

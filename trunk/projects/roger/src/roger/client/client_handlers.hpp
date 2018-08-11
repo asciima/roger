@@ -184,6 +184,7 @@ namespace roger {
 			WAWO_ASSERT(ctx->down_state == WS_IDLE);
 			ctx->down_state = WS_WRITING;
 			WWRP<wawo::packet>& outp = ctx->down_to_client_packets.front();
+			WAWO_ASSERT(outp->len() > 0);
 			ctx->ch_client_ctx->write(outp, f);
 		}
 		else {
@@ -214,6 +215,7 @@ namespace roger {
 	inline void ctx_down(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& income, bool flush = true ) {
 		WAWO_ASSERT(ctx->ch_client_ctx->event_poller()->in_event_loop());
 		if (income != NULL) {
+			WAWO_ASSERT(income->len() > 0);
 			ctx->down_to_client_packets.push(income);
 		}
 		if (ctx->down_state == WS_WRITING || !flush) {
@@ -400,11 +402,35 @@ namespace roger {
 		break;
 		case T_HTTPS:
 		{
-			if (rcode == wawo::OK) {
-				downp->write_left((byte_t*)HTTP_RESP_RELAY_SUCCEED, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
-			} else {
+			if (rcode != wawo::OK) {
 				WAWO_WARN("[roger][https]connect to host: %s:%u failed for: %d", pctx->dst_domain.c_str(), pctx->dst_port, rcode);
-				downp->write_left((byte_t*)HTTP_RESP_CONNECT_HOST_FAILED, wawo::strlen(HTTP_RESP_CONNECT_HOST_FAILED));
+			}
+
+			switch (rcode) {
+				case wawo::OK:
+				{
+					downp->write_left((byte_t*)HTTP_RESP_RELAY_SUCCEED, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
+				}
+				break;
+				case roger::E_DNS_TEMPORARY_ERROR:
+				case roger::E_DNSLOOKUP_RETURN_NO_IP:
+				case roger::E_DNS_BADQUERY:
+				case roger::E_DNS_PROTOCOL_ERROR:
+				{
+					downp->write_left((byte_t*)HTTP_RESP_CONNECT_HOST_FAILED, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
+				}
+				break;
+				case roger::E_DNS_DOMAIN_NO_DATA:
+				case roger::E_DNS_DOMAIN_NAME_NOT_EXISTS:
+				{
+					downp->write_left((byte_t*)HTTP_RESP_BAD_REQUEST, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
+				}
+				break;
+				default:
+				{
+					downp->write_left((byte_t*)HTTP_RESP_CONNECT_HOST_FAILED, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
+				}
+				break;
 			}
 			ctx_down(pctx, downp);
 		}
@@ -663,7 +689,7 @@ namespace roger {
 								ctx_up(pctx, NULL);
 							}
 						} else {
-							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]connect failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code );
+							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]connect failed: %d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code );
 							pctx->state = PIPE_DIAL_SERVER_FAILED;
 							if (pctx->client_read_closed == true) {
 								if (pctx->type == T_HTTP) {

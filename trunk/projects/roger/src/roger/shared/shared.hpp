@@ -41,6 +41,7 @@
 	#define TRACE_SERVER_SIDE_CTX(...)
 #endif
 
+#define ENABLE_TRACE_DNS_RESOLVE
 #ifdef ENABLE_TRACE_DNS_RESOLVE
 	#define TRACE_DNS WAWO_INFO
 #else
@@ -211,7 +212,23 @@ namespace roger {
 		E_UNKNOWN_CMD = -40001,
 		E_INVALID_DOMAIN = -40002,
 		E_INVALID_IPV4 = -40003,
-		E_DNSLOOKUP_RETURN_NO_IP = -40004
+		E_DNSLOOKUP_RETURN_NO_IP = -40004,
+		E_DNS_TEMPORARY_ERROR = -40005,
+		E_DNS_PROTOCOL_ERROR = -40006,
+		E_DNS_DOMAIN_NAME_NOT_EXISTS = -40007,
+		E_DNS_DOMAIN_NO_DATA = -40008,
+		E_DNS_NOMEM = -40009,
+		E_DNS_BADQUERY = -40010,
+	};
+
+	const static int dns_error_map[] = {
+		0,
+		E_DNS_TEMPORARY_ERROR,
+		E_DNS_PROTOCOL_ERROR,
+		E_DNS_DOMAIN_NAME_NOT_EXISTS,
+		E_DNS_DOMAIN_NO_DATA,
+		E_DNS_NOMEM,
+		E_DNS_BADQUERY
 	};
 
 	static const char HTTP_RESP_RELAY_SUCCEED[] =
@@ -233,7 +250,7 @@ namespace roger {
 	static const char HTTP_RESP_SERVER_NO_RESPONSE[] =
 		"HTTP/1.1 444 No response\r\n"
 		"Content-Type: text/plain\r\n"
-		"Connection: keep-alive\r\n\r\n"
+		"Connection: close\r\n\r\n"
 		"ROGER: server closed with no response, please retry (F5)";
 
 	static const char HTTP_RESP_SERVER_RESPONSE_PARSED_FAILED[] =
@@ -275,14 +292,7 @@ namespace roger {
 		~forward_ctx() {
 			TRACE_SERVER_SIDE_CTX("forward_ctx::~forward_ctx()");
 		}
-		/*
-		enum session_flag {
-			F_NONE = 0,
-			F_STREAM_FIN = 1,
-			F_SERVER_FIN = 1 << 1,
-			F_BOTH_FIN = (F_STREAM_FIN | F_SERVER_FIN),
-		};
-		*/
+
 		WWRP<wawo::net::channel_handler_context> ch_stream_ctx;
 		WWRP<wawo::net::channel_handler_context> ch_server_ctx;
 
@@ -302,9 +312,7 @@ namespace roger {
 
 		std::string dst_domain;
 		address		dst_addrv4;
-
-//		int sflag;
-
+		int dns_try_time;
 
 #ifdef ROGER_USE_LIBUDNS
 		WWRP<async_dns_query> query;
@@ -314,8 +322,6 @@ namespace roger {
 		u64_t ts_dns_lookup_done;
 		u64_t ts_server_connect_start;
 		u64_t ts_server_connect_done;
-
-		WWRP<wawo::bytes_ringbuffer> memory_tag;
 	};
 
 	enum http_conn_state {};

@@ -267,10 +267,20 @@ namespace roger {
 		});
 	}
 
+	static void dns_resolve_success(std::vector<in_addr> const& in_addrs, WWRP<wawo::ref_base> const& cookie_);
 	inline static void dns_resolve_error(int const& code, WWRP<wawo::ref_base > const& cookie_) {
 		WAWO_ASSERT(cookie_ != NULL);
 		WWRP<forward_ctx> fctx = wawo::static_pointer_cast<forward_ctx>(cookie_);
 		fctx->ts_dns_lookup_done = wawo::time::curr_microseconds();
+		WAWO_ASSERT(code <= E_DNSLOOKUP_RETURN_NO_IP && code>= E_DNS_BADQUERY );
+
+		if (code == E_DNS_TEMPORARY_ERROR && (fctx->dns_try_time) < 3) {
+			WAWO_ASSERT(fctx->query != NULL);
+			WAWO_ERR("[server][forward_ctx][%s][s%d]dns(%s) lookup failed: %d, try time: %u", server_state_str[fctx->state], fctx->ch_stream_ctx->ch->ch_id(), fctx->dst_domain.c_str(), code, fctx->dns_try_time );
+			fctx->query = dns_resolver::instance()->async_resolve(fctx->dst_domain, fctx, &roger::dns_resolve_success, &roger::dns_resolve_error);
+			++fctx->dns_try_time;
+			return;
+		}
 
 		fctx->ch_stream_ctx->event_poller()->execute([fctx,code]() {
 			WAWO_ASSERT(fctx->query != NULL);
@@ -281,7 +291,6 @@ namespace roger {
 			WAWO_ASSERT(fctx->ch_server_ctx == NULL);
 			WAWO_ASSERT(fctx->down_to_stream_packets.size() == 0);
 			fctx->server_read_closed = true;
-
 			WWRP<wawo::packet> outp = wawo::make_ref<wawo::packet>(64);
 			outp->write<int32_t>(code);
 			flush_down(fctx, outp);
@@ -339,8 +348,6 @@ namespace roger {
 			fctx->ts_dns_lookup_done = 0;
 			fctx->ts_server_connect_start = 0;
 			fctx->ts_server_connect_done = 0;
-
-			fctx->memory_tag = wawo::make_ref<wawo::bytes_ringbuffer>(3777);
 
 			TRACE_SERVER_SIDE_CTX("[server][forward_ctx][s%u]stream_accepted", fctx->ch_stream_ctx->ch->ch_id() );
 		}
@@ -439,8 +446,8 @@ namespace roger {
 					fctx->state = LOOKUP_SERVER_NAME;
 					fctx->dst_domain = std::string(domain, nbytes);
 					fctx->ts_dns_lookup_start = wawo::time::curr_microseconds();
+					fctx->dns_try_time = 1;
 					fctx->query = dns_resolver::instance()->async_resolve(fctx->dst_domain, fctx, &dns_resolve_success, &dns_resolve_error);
-					TRACE_DNS("[server][s%u]async resolve: %s", s->id, fctx->dst_domain.cstr);
 					WAWO_ASSERT(fctx->query != NULL);
 					return;
 				}
