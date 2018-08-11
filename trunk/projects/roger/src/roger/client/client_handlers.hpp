@@ -97,10 +97,15 @@ namespace roger {
 		switch (ctx->state) {
 			case PIPE_DIALING_STREAM:
 			case PIPE_DIAL_STREAM_OK:
+			{
+				WAWO_ASSERT(!"PROXY STATE LOGIC ISSUE");
+			}
+			break;
 			case PIPE_DIALING_SERVER:
 			case PIPE_DIAL_SERVER_OK:
 			{
 				//check ctx stats first
+				WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
 				if (ctx->up_to_stream_packets.size()) {
 					WWRP<wawo::net::channel_promise> f = ctx->ch_stream_ctx->make_channel_promise();
 					f->add_listener([ctx](WWRP<wawo::net::channel_future> const& f) {
@@ -121,6 +126,13 @@ namespace roger {
 						}
 					}
 				}
+			}
+			break;
+			case PIPE_DIAL_SERVER_FAILED:
+			{
+				WAWO_ASSERT(ctx->client_read_closed == true);
+				WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
+				ctx->ch_stream_ctx->shutdown_write();
 			}
 			break;
 			default:
@@ -280,12 +292,14 @@ namespace roger {
 		case PIPE_DIALING_STREAM:
 		{
 			WAWO_ASSERT(ctx->ch_stream_ctx == NULL);
+		}
+		case PIPE_DIAL_STREAM_OK:
+		{
 			if (up != NULL) {
 				ctx->pending_outp.push(up);
 			}
 		}
 		break;
-		case PIPE_DIAL_STREAM_OK:
 		case PIPE_DIALING_SERVER:
 		case PIPE_DIAL_SERVER_OK:
 		{
@@ -295,6 +309,13 @@ namespace roger {
 				ctx->pending_outp.pop();
 			}
 			WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
+			ctx_up(ctx, up);
+		}
+		break;
+		case PIPE_DIAL_SERVER_FAILED:
+		{
+			WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
+			WAWO_ASSERT(up == NULL);
 			ctx_up(ctx, up);
 		}
 		break;
@@ -637,6 +658,8 @@ namespace roger {
 							else {
 								ctx_up(pctx, NULL);
 							}
+						} else {
+							pctx->state = PIPE_DIAL_SERVER_FAILED;
 						}
 						resp_connect_result_to_client(pctx, income, code);
 					}
