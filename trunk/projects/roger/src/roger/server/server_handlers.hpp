@@ -282,6 +282,8 @@ namespace roger {
 					WAWO_ERR("[server][forward_ctx][%s][s%d]dns(%s) lookup failed: %d, try time: %u", server_state_str[fctx->state], fctx->ch_stream_ctx->ch->ch_id(), fctx->dst_domain.c_str(), code, fctx->dns_try_time);
 					fctx->query = dns_resolver::instance()->async_resolve(fctx->dst_domain, fctx, &roger::dns_resolve_success, &roger::dns_resolve_error);
 					++fctx->dns_try_time;
+					(void)t;
+					(void)c;
 				});
 
 			fctx->ch_stream_ctx->event_poller()->start_timer(retry_timer);
