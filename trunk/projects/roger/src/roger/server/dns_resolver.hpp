@@ -83,7 +83,7 @@ namespace roger {
 			m_timer = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(200), WWRP<ref_base>(NULL), &dns_resolver::cb_dns_timeout, this);
 			so->init();
 			//libudns do not support iocp
-			so->begin_read(F_WATCH_READ_INFINITE, std::bind(&dns_resolver::async_read_dns_reply, this, std::placeholders::_1));
+			so->ch_async_io_begin_read(F_WATCH_READ_INFINITE, std::bind(&dns_resolver::async_read_dns_reply, this, std::placeholders::_1));
 			m_so = so;
 			return wawo::OK;
 		}

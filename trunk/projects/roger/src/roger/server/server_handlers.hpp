@@ -190,13 +190,13 @@ namespace roger {
 		void write_block(WWRP<channel_handler_context> const& ctx) {
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
-			fctx->ch_stream_ctx->ch->end_read();
+			fctx->ch_stream_ctx->ch->ch_async_io_end_read();
 		}
 
 		void write_unblock(WWRP<channel_handler_context> const& ctx) {
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
-			fctx->ch_stream_ctx->ch->begin_read();
+			fctx->ch_stream_ctx->ch->ch_async_io_begin_read();
 			flush_up(fctx,NULL);
 		}
 
@@ -527,7 +527,7 @@ namespace roger {
 			WAWO_ASSERT(fctx != NULL);
 			WAWO_ASSERT(fctx->ch_stream_ctx == ctx);
 			TRACE_SERVER_SIDE_CTX("[server][s%u]stream write blocked", fctx->ch_stream_ctx->ch->ch_id());
-			fctx->ch_server_ctx->ch->end_read();
+			fctx->ch_server_ctx->ch->ch_async_io_end_read();
 		}
 
 		void write_unblock(WWRP<wawo::net::channel_handler_context> const& ctx) {
@@ -537,7 +537,7 @@ namespace roger {
 
 			fctx->ch_stream_ctx->event_poller()->execute([fctx,ctx]() {
 				WAWO_ASSERT(fctx->ch_stream_ctx == ctx);
-				fctx->ch_server_ctx->ch->begin_read();
+				fctx->ch_server_ctx->ch->ch_async_io_begin_read();
 				flush_down(fctx, NULL);
 			});
 		}
