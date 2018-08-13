@@ -345,18 +345,18 @@ namespace roger {
 	static inline int http_parse_down( WWRP<proxy_ctx> const& pctx, WWRP<wawo::packet> const& income) {
 		WAWO_ASSERT(pctx->http_resp_parser != NULL);
 		int ec = 0;
-		u32_t nparsed = 0;
+		u32_t nparsed_total = 0;
 		while (income->len()) {
-			nparsed += pctx->http_resp_parser->parse((char*)income->begin(), income->len(), ec);
+			u32_t nparsed = pctx->http_resp_parser->parse((char*)income->begin(), income->len(), ec);
 			WAWO_ASSERT(nparsed >=0 );
 			income->skip(nparsed);
-
+			nparsed_total += nparsed;
 			if (ec != wawo::OK) {
 				WAWO_ERR("[roger][s%u]mux_stream resp, parse failed: %u", pctx->ch_stream_ctx->ch->ch_id(), ec);
 				break;
 			}
 		}
-		TRACE_HTTP_PROXY("[roger][s%u]parsed bytes: %u, income: %u, ec: %d", pctx->ch_stream_ctx->ch->ch_id(), nparsed, income->len() ,ec );
+		TRACE_HTTP_PROXY("[roger][s%u]parsed bytes: %u, income: %u, ec: %d", pctx->ch_stream_ctx->ch->ch_id(), nparsed_total, income->len() ,ec );
 		return ec;
 	}
 
