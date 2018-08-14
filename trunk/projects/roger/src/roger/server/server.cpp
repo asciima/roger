@@ -24,13 +24,7 @@ int main(int argc, char** argv) {
 
 	std::vector<std::string> ns;
 #if WAWO_ISWIN
-	/*
-	std::vector<wawo::net::address> addrs;
-	wawo::env::instance()->get_local_ip_list(addrs);
-	std::for_each(addrs.begin(), addrs.end(), [](wawo::net::address const& addr) {
-		WAWO_INFO("%s", addr.info().c_str());
-	});
-	*/
+
 	std::vector<wawo::net::address> addrs_dns;
 	wawo::env::instance()->get_local_dns_server_list(addrs_dns);
 
