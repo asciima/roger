@@ -276,7 +276,7 @@ namespace roger {
 		wawo::strtoupper((char*)upper, WAWO_HTTP_METHOD_NAME_MAX_LEN, (char*)method);
 
 		for (u8_t i = 0; i < wawo::net::protocol::http::O_MAX; ++i) {
-			if (wawo::strpos((char*)upper, wawo::net::protocol::http::option_name[i]) != -1) {
+			if (wawo::strpos((char*)upper, option_name_str[i]) != -1) {
 				if (i == wawo::net::protocol::http::O_CONNECT) {
 					pctx->type = T_HTTPS;
 					return E_OK;

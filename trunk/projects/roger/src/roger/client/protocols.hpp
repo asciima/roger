@@ -4,7 +4,18 @@
 #include <wawo.h>
 
 namespace roger {
-	struct proxy_ctx;
+
+	static const char* option_name_str[wawo::net::protocol::http::O_MAX] = {
+		"GET",
+		"HEAD",
+		"POST",
+		"PUT",
+		"DELETE",
+		"CONNECT",
+		"OPTIONS",
+		"TRACE"
+	};
+
 
 	enum protocol_parse_error {
 		E_WAIT_BYTES_ARRIVE = 1,
@@ -21,6 +32,7 @@ namespace roger {
 		E_SOCKS5_UNSUPPORTED_CMD= -10
 	};
 
+	struct proxy_ctx;
 	void _socks5_check_auth(WWRP<proxy_ctx> const& ctx);
 	int _socks5_check_cmd(WWRP<proxy_ctx> const& ctx);
 

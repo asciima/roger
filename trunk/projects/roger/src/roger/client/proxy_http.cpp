@@ -58,14 +58,14 @@ namespace roger {
 		int nrequest;
 		if (m->urlfields.query.length()) {
 			nrequest = snprintf(request_line, 8192, "%s %s?%s HTTP/%d.%d\r\n"
-				, wawo::net::protocol::http::option_name[m->opt]
+				, roger::option_name_str[m->opt]
 				, m->urlfields.path.c_str()
 				, m->urlfields.query.c_str()
 				, m->ver.major
 				, m->ver.minor);
 		} else {
 			nrequest = snprintf(request_line, 8192, "%s %s HTTP/%d.%d\r\n"
-				, wawo::net::protocol::http::option_name[m->opt]
+				, roger::option_name_str[m->opt]
 				, m->urlfields.path.c_str()
 				, m->ver.major
 				, m->ver.minor);
@@ -112,7 +112,7 @@ namespace roger {
 			//@TODO
 			//check url:https://tools.ietf.org/html/rfc2616#page-128 to process a empty host string
 			if( pctx->cur_req->urlfields.host.length() == 0 ) {
-				WAWO_WARN("opt: %s, data: %s", wawo::net::protocol::http::option_name[pctx->cur_req->opt], data);
+				WAWO_WARN("opt: %s, data: %s", option_name_str[pctx->cur_req->opt], data);
 			}
 
 			WAWO_ASSERT(pctx->cur_req->urlfields.host.length() > 0);
