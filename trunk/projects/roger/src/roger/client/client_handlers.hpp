@@ -507,7 +507,7 @@ namespace roger {
 
 			dial_f->add_listener([P=this](WWRP<wawo::net::channel_future> const& f) {
 				if (f->get() != wawo::OK) {
-					WW_SCHEDULER->schedule([P]() {
+					io_event_loop_group::instance()->schedule([P]() {
 						P->dial_one_mux();
 					});
 				}
