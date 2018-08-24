@@ -71,8 +71,8 @@ $(CLIENT_TARGET): $(APP_ALL_O_FILES_CLIENT)
 	
 	@echo "---"
 	@echo \*\* assembling $(CLIENT_TARGET)...
-	@echo $(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS)
-	@$(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS)
+	@echo $(CXX) $(LINK_MISC) $^ -o $@ $(LINK_CLIENT_LIBS)
+	@$(CXX) $(LINK_MISC) $^ -o $@ $(LINK_CLIENT_LIBS)
 	
 	@cp -f $(APP_PROXY_PAC_PATH) $(APP_BUILD_TARGET_PATH)
 	@echo "---"
@@ -109,6 +109,6 @@ roger_server_clean: udns_clean wawo_clean
 roger_server_run:
 	$(SERVER_TARGET) 0.0.0.0 12120 wcp
 
-roger_client_clean: udns_clean wawo_clean
+roger_client_clean: wawo_clean
 	rm -rf $(CLIENT_BIN_OBJECTS_PATH)/*
 	rm -rf $(CLIENT_TARGET)

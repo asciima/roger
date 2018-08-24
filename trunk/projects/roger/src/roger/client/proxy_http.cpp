@@ -6,6 +6,17 @@
 
 namespace roger {
 
+	static const char* option_name_str[wawo::net::protocol::http::O_MAX] = {
+		"GET",
+		"HEAD",
+		"POST",
+		"PUT",
+		"DELETE",
+		"CONNECT",
+		"OPTIONS",
+		"TRACE"
+	};
+
 	inline int int_to_hex_string(int n, char* const hex_string, wawo::u32_t len) {
 		char* start = hex_string;
 		static char _HEX_CHAR_[] = {
@@ -77,6 +88,33 @@ namespace roger {
 		m->h.encode(H);
 		H->write_left((byte_t*)request_line, nrequest);
 		o = H;
+	}
+
+	int _detect_http_proxy(WWRP<proxy_ctx> const& pctx) {
+		byte_t method[WAWO_HTTP_METHOD_NAME_MAX_LEN + 1] = { 0 };
+		if (pctx->protocol_packet->len() < WAWO_HTTP_METHOD_NAME_MAX_LEN) {
+			return E_WAIT_BYTES_ARRIVE;
+		}
+
+		pctx->protocol_packet->peek(method, WAWO_HTTP_METHOD_NAME_MAX_LEN);
+
+		byte_t upper[WAWO_HTTP_METHOD_NAME_MAX_LEN];
+		wawo::strtoupper((char*)upper, WAWO_HTTP_METHOD_NAME_MAX_LEN, (char*)method);
+
+		for (u8_t i = 0; i < wawo::net::protocol::http::O_MAX; ++i) {
+			if (wawo::strpos((char*)upper, option_name_str[i]) != -1) {
+				if (i == wawo::net::protocol::http::O_CONNECT) {
+					pctx->type = T_HTTPS;
+					return E_OK;
+				}
+				else {
+					pctx->type = T_HTTP;
+					return E_OK;
+				}
+			}
+		}
+
+		return E_UNKNOWN_HTTP_METHOD;
 	}
 	
 	namespace http_req {

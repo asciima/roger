@@ -50,6 +50,7 @@ INCLUDES:= \
 
 	
 LINK_LIBS := -lrt -lpthread -ldl -Xlinker "-(" $(LIB_LINK_LIBS_ALL_LIBS) -Xlinker "-)"
+LINK_CLIENT_LIBS := -lrt -lpthread -ldl -Xlinker "-(" $(LIB_LINK_LIBS_CLIENT_LIBS) -Xlinker "-)"
 
 
 include _module-libs.inc

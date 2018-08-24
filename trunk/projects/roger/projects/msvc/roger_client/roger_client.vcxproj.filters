@@ -30,7 +30,7 @@
     <ClCompile Include="..\..\..\src\roger\client\proxy_http.cpp">
       <Filter>源文件\src\client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\roger\client\protocols.cpp">
+    <ClCompile Include="..\..\..\src\roger\client\proxy_socks.cpp">
       <Filter>源文件\src\client</Filter>
     </ClCompile>
   </ItemGroup>
@@ -41,7 +41,7 @@
     <ClInclude Include="..\..\..\src\roger\client\client_handlers.hpp">
       <Filter>源文件\src\client</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\roger\client\protocols.hpp">
+    <ClInclude Include="..\..\..\src\roger\client\proxy_socks.hpp">
       <Filter>源文件\src\client</Filter>
     </ClInclude>
   </ItemGroup>

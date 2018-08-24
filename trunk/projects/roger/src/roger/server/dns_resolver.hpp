@@ -129,7 +129,7 @@ namespace roger {
 			if (result == NULL) {
 				int code = dns_status(ctx);
 				WAWO_ASSERT(code != wawo::OK);
-				WAWO_ASSERT(code >= dns_status::DNS_E_BADQUERY && code <= dns_status::DNS_E_TEMPFAIL);
+				WAWO_ASSERT(code >= ::DNS_E_BADQUERY && code <= ::DNS_E_TEMPFAIL);
 				int newcode = dns_error_map[WAWO_ABS(code)];
 				WAWO_ERR("[dns_resolver]dns resolve failed: %d:%s", code, dns_strerror(code));
 				cookie->error(newcode, cookie->user_cookie);

@@ -1,6 +1,6 @@
 #include <wawo.h>
 #include "../shared/shared.hpp"
-#include "protocols.hpp"
+#include "proxy_socks.hpp"
 
 
 namespace roger {
@@ -21,7 +21,7 @@ namespace roger {
 		}
 
 		WWRP<proxy_ctx> parent;
-		u32_t stream_id;
+		channel_id_t stream_id;
 		proxy_forward_type type;
 		proxy_state state;
 

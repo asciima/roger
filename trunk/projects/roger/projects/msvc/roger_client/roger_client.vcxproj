@@ -86,12 +86,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\roger\client\client.cpp" />
-    <ClCompile Include="..\..\..\src\roger\client\protocols.cpp" />
+    <ClCompile Include="..\..\..\src\roger\client\proxy_socks.cpp" />
     <ClCompile Include="..\..\..\src\roger\client\proxy_http.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\roger\client\client_handlers.hpp" />
-    <ClInclude Include="..\..\..\src\roger\client\protocols.hpp" />
+    <ClInclude Include="..\..\..\src\roger\client\proxy_socks.hpp" />
     <ClInclude Include="..\..\..\src\roger\shared\shared.hpp" />
   </ItemGroup>
   <ItemGroup>
