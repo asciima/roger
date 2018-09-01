@@ -80,7 +80,7 @@ namespace roger {
 				return nonblocking;
 			}
 
-			m_timer = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(200), WWRP<ref_base>(NULL), &dns_resolver::cb_dns_timeout, this);
+			m_timer = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(200), &dns_resolver::cb_dns_timeout, this);
 			so->init();
 			//libudns do not support iocp
 			so->async_io_init();
@@ -96,7 +96,7 @@ namespace roger {
 			m_dns_ctx = NULL;
 		}
 
-		void cb_dns_timeout( WWRP<wawo::timer> const& t, WWRP<ref_base> const& cookie ) {
+		void cb_dns_timeout( WWRP<wawo::timer> const& t) {
 			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			WAWO_ASSERT(m_has_timer == true);
 			if (m_dns_ctx == NULL) {
@@ -108,7 +108,6 @@ namespace roger {
 				return;
 			}
 			m_so->event_poller()->start_timer(t);
-			(void)cookie;
 		}
 
 		void async_read_dns_reply(async_io_result const& r) {
