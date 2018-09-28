@@ -936,6 +936,14 @@ namespace roger {
 				}
 
 				WWRP<wawo::net::handler::mux> mux_ = roger::mux_pool::instance()->next();
+
+				if (mux_ == NULL) {
+					WAWO_ERR("[client][#%u]no mux connected", pctx->ch_client_ctx->ch->ch_id());
+					pctx->state = PIPE_DIAL_STREAM_FAILED;
+					pctx->ch_client_ctx->close();
+					goto _end_check;
+				}
+
 				WAWO_ASSERT(mux_ != NULL);
 				wawo::net::handler::mux_stream_id_t sid=wawo::net::handler::mux_make_stream_id();
 
