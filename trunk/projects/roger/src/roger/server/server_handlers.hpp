@@ -260,7 +260,7 @@ namespace roger {
 				u64_t dns_lookup_time = fctx->ts_dns_lookup_done - fctx->ts_dns_lookup_start;
 				WAWO_ASSERT(fctx->ts_server_connect_done>=fctx->ts_server_connect_start);
 				u64_t server_connect_time = fctx->ts_server_connect_done - fctx->ts_server_connect_start;
-				if (dns_lookup_time > 50000) {
+				if (dns_lookup_time > 1000000) {
 					WAWO_INFO("connect statistic: dns_lookup: %.3f ms, connect: %.3f ms, connect result: %d, domain: %s", dns_lookup_time / 1000.0, server_connect_time / 1000.0, rt, fctx->dst_domain.c_str());
 				}
 			});

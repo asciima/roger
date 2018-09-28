@@ -264,8 +264,14 @@ namespace roger {
 				_pctx->parent = pctx;
 				pctx->http_proxy_ctx_map.insert({ _HP_key, _pctx });
 
-
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
+				if (mux_ == NULL) {
+					WAWO_ERR("[client][#%u]no mux connected", pctx->ch_client_ctx->ch->ch_id());
+					pctx->state = PIPE_DIAL_STREAM_FAILED;
+					pctx->ch_client_ctx->close();
+					return WAWO_NEGATIVE(HPE_UNKNOWN);
+				}
+
 				wawo::net::handler::mux_stream_id_t sid = wawo::net::handler::mux_make_stream_id();
 
 				int ec;
