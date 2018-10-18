@@ -727,6 +727,22 @@ namespace roger {
 				}
 			});
 		}
+
+		void write_block(WWRP<channel_handler_context> const& ctx) {
+			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
+			WAWO_ASSERT(pctx != NULL);
+			pctx->ch_client_ctx->ch->ch_async_io_end_read();
+		}
+
+		void write_unblock(WWRP<channel_handler_context> const& ctx) {
+			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
+			WAWO_ASSERT(pctx != NULL);
+			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
+			pctx->ch_client_ctx->ch->ch_async_io_begin_read();
+			pctx->ch_client_ctx->event_poller()->execute([pctx]() {
+				ctx_up(pctx, NULL);
+			});
+		}
 	};
 
 	class local_proxy_handler :
