@@ -370,8 +370,7 @@ namespace roger {
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 			pctx->ch_client_ctx->write(http_reply);
 
-			WWSP<wawo::net::protocol::http::message>& req = pctx->reqs.front();
-			TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]http cancel req, code: %u, total resp count: %u, url: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), cancel_code, pctx->resp_count, req->url.c_str());
+			TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]http cancel req, code: %u, total resp count: %u, url: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), cancel_code, pctx->resp_count, pctx->reqs.front()->url.c_str());
 			pctx->reqs.pop();
 		}
 	}

@@ -38,8 +38,8 @@ int main(int argc, char** argv) {
 
 	WAWO_INFO("[roger]server start...");
 	wawo::net::address address;
-	std::string proto = std::string("tcp");
-	std::string listenurl = "tcp://0.0.0.0:13726";
+	std::string proto = std::string("wcp");
+	std::string listenurl = "wcp://0.0.0.0:13726";
 
 	if (argc == 4) {
 		std::string ip(argv[1]);
