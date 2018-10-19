@@ -20,7 +20,7 @@
 #endif
 
 //#define ENABLE_TRACE_SERVER_SIDE_CTX
-//#define ENABLE_TRACE_CLIENT_SIDE_CTX
+#define ENABLE_TRACE_CLIENT_SIDE_CTX
 //#define DEBUG_HTTP_PROXY
 //#define ENABLE_TRACE_DNS_RESOLVE
 
@@ -297,7 +297,7 @@ namespace roger {
 
 	enum ctx_write_state {
 		WS_IDLE,
-		WS_WRITING
+		WS_WRITING,
 	};
 
 	struct forward_ctx :

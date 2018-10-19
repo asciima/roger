@@ -65,6 +65,7 @@ namespace roger {
 			//fctx->up_state = forward_ctx_write_state::WS_BLOCKED;
 		}
 		else {
+			fctx->ch_stream_ctx->shutdown_read();
 			fctx->ch_server_ctx->close();
 		}
 	}
@@ -120,7 +121,7 @@ namespace roger {
 		else {
 			//ERROR
 			//DO CLOSE
-			//fctx->ch_server_ctx->close();
+			fctx->ch_server_ctx->shutdown_read();
 			fctx->ch_stream_ctx->close();
 		}
 	}

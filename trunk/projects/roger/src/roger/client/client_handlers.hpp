@@ -156,6 +156,7 @@ namespace roger {
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
 		}
 		else {
+			ctx->ch_client_ctx->shutdown_read();
 			ctx->ch_stream_ctx->close();
 		}
 	}
@@ -208,14 +209,17 @@ namespace roger {
 		{
 		}
 		else {
+			ctx->ch_stream_ctx->shutdown_read();
 			ctx->ch_client_ctx->close();
 		}
 	}
 
 	inline void ctx_down(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& income, bool flush = true ) {
 		WAWO_ASSERT(ctx->ch_client_ctx->event_poller()->in_event_loop());
+
 		if (income != NULL) {
 			WAWO_ASSERT(income->len() > 0);
+			WAWO_ASSERT(ctx->stream_read_closed == false);
 			ctx->down_to_client_packets.push(income);
 		}
 		if (ctx->down_state == WS_WRITING || !flush) {
@@ -674,6 +678,8 @@ namespace roger {
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
 
 			pctx->ch_client_ctx->event_poller()->execute([ctx,pctx, income]() {
+				WAWO_ASSERT(pctx->stream_read_closed == false);
+
 				switch (pctx->state) {
 					case PIPE_DIALING_SERVER:
 					{
