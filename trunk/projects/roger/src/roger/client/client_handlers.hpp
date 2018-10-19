@@ -209,7 +209,9 @@ namespace roger {
 		{
 		}
 		else {
-			ctx->ch_stream_ctx->shutdown_read();
+			if (ctx->ch_stream_ctx != NULL) {
+				ctx->ch_stream_ctx->shutdown_read();
+			}
 			ctx->ch_client_ctx->close();
 		}
 	}
@@ -1034,12 +1036,11 @@ namespace roger {
 					income->skip(nparsed);
 
 					if (ec != wawo::OK) {
-						pctx->state = HTTP_PARSE_ERROR;
-						pctx->stream_read_closed = true;
 						WWRP<wawo::packet> downp = wawo::make_ref<packet>(64);
 						downp->write((wawo::byte_t*)HTTP_RESP_BAD_REQUEST, wawo::strlen(HTTP_RESP_BAD_REQUEST) );
 						http_down(pctx, downp);
-
+						pctx->state = HTTP_PARSE_ERROR;
+						pctx->stream_read_closed = true;
 						//double confirm close immediately
 						pctx->ch_client_ctx->close();
 						WAWO_WARN("[roger][#%u]http request parsed failed: %d", pctx->ch_client_ctx->ch->ch_id(), ec);
