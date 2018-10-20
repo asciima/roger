@@ -61,8 +61,6 @@ namespace roger {
 			_do_flush_up(fctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
-			//IGNORE
-			//fctx->up_state = forward_ctx_write_state::WS_BLOCKED;
 		}
 		else {
 			fctx->ch_stream_ctx->shutdown_read();
@@ -115,12 +113,8 @@ namespace roger {
 			_do_flush_down(fctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
-			//IGNORE
-			//fctx->down_state = forward_ctx_write_state::WS_BLOCKED;
 		}
 		else {
-			//ERROR
-			//DO CLOSE
 			fctx->ch_server_ctx->shutdown_read();
 			fctx->ch_stream_ctx->close();
 		}
