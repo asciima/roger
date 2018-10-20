@@ -335,6 +335,7 @@ namespace roger {
 	}
 
 	static inline void http_down(WWRP<proxy_ctx> const& ppctx, WWRP<wawo::packet> const& down /*NULL to close write*/) {
+		ctx_down(ppctx, down);
 		if (ppctx->http_proxy_ctx_map.size() == 0) {
 			ppctx->stream_read_closed = true;
 		} else {
@@ -345,7 +346,6 @@ namespace roger {
 				ppctx->stream_read_closed = true;
 			}
 		}
-		ctx_down(ppctx, down);
 	}
 
 	static inline int http_parse_down( WWRP<proxy_ctx> const& pctx, WWRP<wawo::packet> const& income) {
