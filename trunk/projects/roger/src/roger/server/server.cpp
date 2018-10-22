@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
 
 		ch->pipeline()->add_last(h_mux);
 
+		WAWO_INFO("[roger]new mux connected: %u", ch->ch_id() );
 	}, roger::mux_cfg );
 
 	if (lch->get() != wawo::OK) {
