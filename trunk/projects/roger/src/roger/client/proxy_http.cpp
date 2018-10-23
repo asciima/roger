@@ -263,6 +263,7 @@ namespace roger {
 				pctx->cur_req_ctx = _pctx;
 				_pctx->parent = pctx;
 				pctx->http_proxy_ctx_map.insert({ _HP_key, _pctx });
+				WAWO_ASSERT(pctx->stream_read_closed == false);
 
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
 				if (mux_ == NULL) {
@@ -302,7 +303,7 @@ namespace roger {
 							_pctx->http_resp_parser = NULL;
 
 							pctx->http_proxy_ctx_map.erase(_HP_key);
-							http_down(pctx, NULL);
+							http_down(pctx, NULL,true );
 						}
 					});
 				});

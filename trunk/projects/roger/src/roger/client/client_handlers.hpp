@@ -334,18 +334,20 @@ namespace roger {
 		}
 	}
 
-	static inline void http_down(WWRP<proxy_ctx> const& ppctx, WWRP<wawo::packet> const& down /*NULL to close write*/) {
-		ctx_down(ppctx, down);
-		if (ppctx->http_proxy_ctx_map.size() == 0) {
-			ppctx->stream_read_closed = true;
-		} else {
-			stream_http_proxy_ctx_map_t::iterator _it = std::find_if(ppctx->http_proxy_ctx_map.begin(), ppctx->http_proxy_ctx_map.end(), [](stream_http_proxy_ctx_pair_t const& pair) {
-				return pair.second->reqs.size() != 0;
-			});
-			if (_it == ppctx->http_proxy_ctx_map.end()) {
+	static inline void http_down(WWRP<proxy_ctx> const& ppctx, WWRP<wawo::packet> const& down , bool check_read_close = false ) {
+		if (check_read_close) {
+			if (ppctx->http_proxy_ctx_map.size() == 0) {
 				ppctx->stream_read_closed = true;
+			} else {
+				stream_http_proxy_ctx_map_t::iterator _it = std::find_if(ppctx->http_proxy_ctx_map.begin(), ppctx->http_proxy_ctx_map.end(), [](stream_http_proxy_ctx_pair_t const& pair) {
+					return pair.second->reqs.size() != 0;
+				});
+				if (_it == ppctx->http_proxy_ctx_map.end()) {
+					ppctx->stream_read_closed = true;
+				}
 			}
 		}
+		ctx_down(ppctx, down);
 	}
 
 	static inline int http_parse_down( WWRP<proxy_ctx> const& pctx, WWRP<wawo::packet> const& income) {
@@ -640,9 +642,8 @@ namespace roger {
 					pctx->http_resp_parser = NULL;
 
 					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
-
 					TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]erase from ppctx", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
-					http_down(ppctx, NULL);
+					http_down(ppctx, NULL,true);
 				} else {
 					pctx->stream_read_closed = true;
 					ctx_down(pctx, NULL);
@@ -820,7 +821,7 @@ namespace roger {
 			//pctx->ch_stream_ctx->ch->begin_read();
 			if (pctx->type == T_HTTP) {
 				//WAWO_ASSERT(pctx->parent != NULL);
-				http_down(pctx, NULL);
+				http_down(pctx, NULL ); //JUST TRY TO FLUSH
 			}
 			else {
 				ctx_down(pctx, NULL);
@@ -1041,6 +1042,7 @@ namespace roger {
 						http_down(pctx, downp);
 						pctx->state = HTTP_PARSE_ERROR;
 						pctx->stream_read_closed = true;
+						http_down(pctx, NULL);
 						//double confirm close immediately
 						pctx->ch_client_ctx->close();
 						WAWO_WARN("[roger][#%u]http request parsed failed: %d", pctx->ch_client_ctx->ch->ch_id(), ec);
