@@ -539,8 +539,9 @@ namespace roger {
 				}
 				++it;
 			}
-
-			dial_one_mux();
+			WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(1), [](WWRP<timer> const& t) {
+				mux_pool::instance()->dial_one_mux();
+			});
 			//connect new
 		}
 
