@@ -115,7 +115,9 @@ namespace roger {
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
 		}
 		else {
-			fctx->ch_server_ctx->shutdown_read();
+			if (fctx->ch_server_ctx != NULL) {
+				fctx->ch_server_ctx->shutdown_read();
+			}
 			fctx->ch_stream_ctx->close();
 		}
 	}
