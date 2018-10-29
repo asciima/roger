@@ -628,7 +628,6 @@ namespace roger {
 					WAWO_ASSERT(ppctx->type == T_HTTP);
 					WAWO_ASSERT(pctx->type == T_HTTP);
 					WAWO_ASSERT(pctx->parent != NULL);
-
 					pctx->stream_read_closed = true;
 					//@todo
 					//schedule another req
@@ -1031,6 +1030,8 @@ namespace roger {
 			case HTTP_REQ_PARSE:
 			{
 				WAWO_ASSERT(pctx->http_req_parser != NULL);
+				WAWO_ASSERT(pctx->stream_read_closed == false);
+
 				int ec = wawo::OK;
 				while (income->len() && pctx->state == HTTP_REQ_PARSE) {
 					u32_t nparsed = pctx->http_req_parser->parse((char const *)income->begin(), income->len(), ec);

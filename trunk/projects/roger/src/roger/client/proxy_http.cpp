@@ -150,10 +150,11 @@ namespace roger {
 			//@TODO
 			//check url:https://tools.ietf.org/html/rfc2616#page-128 to process a empty host string
 			if( pctx->cur_req->urlfields.host.length() == 0 ) {
+				//we'll check host header later
 				WAWO_WARN("opt: %s, data: %s", option_name_str[pctx->cur_req->opt], data);
 			}
 
-			WAWO_ASSERT(pctx->cur_req->urlfields.host.length() > 0);
+			//WAWO_ASSERT(pctx->cur_req->urlfields.host.length() > 0);
 			return wawo::OK;
 		}
 
@@ -187,21 +188,38 @@ namespace roger {
 
 			roger_connect_address_type address_type = HOST;
 			std::string host = pctx->cur_req->urlfields.host;
-			ipv4_t ipv4 = 0;
 			port_t port = pctx->cur_req->urlfields.port;
 
-			//@refer to https://tools.ietf.org/html/rfc2616: 5.1.2 Request-URI
-			//The absoluteURI form is REQUIRED when the request is being made to a proxy
-			WAWO_ASSERT(host.length() > 0);
-			WAWO_ASSERT(port > 0);
+			if (host.length() == 0) {
+				//borrow from header
+				if (pctx->cur_req->h.have("host")) {
+					std::string _host = pctx->cur_req->h.get("host");
+					std::string::size_type n = _host.find(":");
+					if (n != std::string::npos) {
+						const std::string _port = _host.substr(n + 1);
+						host = _host.substr(0,n);
+						port = wawo::to_u32(_port.c_str()) & 0xFFFF;
+					} else {
+						host = _host;
+						port = 80;
+					}
+				}
+			}
 
-			if (host.length() >= 512) {
-				WAWO_ERR("[roger][#%u]host len exceed 512, host: %s", pctx->ch_client_ctx->ch->ch_id(), host.c_str());
-				//invalid http url host
+			if (host.length() == 0 || 
+				host.length() >= 512
+				) {
+				WAWO_ERR("[roger][#%u]invalid http request: %s", pctx->ch_client_ctx->ch->ch_id(), host.c_str());
 				return WAWO_NEGATIVE(HPE_INVALID_URL);
 			}
 
+			//@refer to https://tools.ietf.org/html/rfc2616: 5.1.2 Request-URI
+			//The absoluteURI form is REQUIRED when the request is being made to a proxy
+			//WAWO_ASSERT(host.length() > 0);
+			WAWO_ASSERT(port > 0);
+
 			//adjust for xx.xx.xx.xx
+			ipv4_t ipv4 = 0;
 			if (wawo::net::is_dotipv4_decimal_notation(host.c_str())) {
 				wawo::net::dotiptoip(host.c_str(), ipv4);
 				address_type = IPV4;
@@ -224,10 +242,9 @@ namespace roger {
 			/*
 			 *@refer to RFC7230 , clients are not encouraged to send Proxy-Connection
 			 */
-			pctx->cur_req->h.remove("Proxy-Connection");
 			pctx->cur_req->h.remove("proxy-connection");
 
-			std::string _HP_key = host + ":"+ std::to_string(port);
+			const std::string _HP_key = host + ":"+ std::to_string(port);
 			stream_http_proxy_ctx_map_t::iterator it = pctx->http_proxy_ctx_map.find(_HP_key);
 
 			if (it != pctx->http_proxy_ctx_map.end() ) {
@@ -461,9 +478,7 @@ namespace roger {
 			WWRP<proxy_ctx> ppctx = pctx->parent;
 			WAWO_ASSERT(pctx->state == PIPE_DIAL_SERVER_OK);
 
-			if (pctx->cur_resp->h.get("Connection") == "close" ||
-				pctx->cur_resp->h.get("connection") == "close"
-				)
+			if (pctx->cur_resp->h.get("connection") == "close")
 			{
 				/* don't change first resp
 				* for others , keep-alive
@@ -551,8 +566,7 @@ namespace roger {
 			else {
 
 				WWSP<wawo::net::protocol::http::message> _m = pctx->reqs.front();
-				if( _m->h.get("Connection") == "close" || 
-					_m->h.get("connection") == "close") {
+				if(_m->h.get("connection") == "close") {
 					WAWO_ASSERT(pctx->reqs.size() == 1);
 
 					pctx->client_read_closed = true;
