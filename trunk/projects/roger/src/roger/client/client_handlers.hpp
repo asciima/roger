@@ -12,7 +12,6 @@ namespace roger {
 	struct proxy_ctx :
 		public wawo::ref_base
 	{
-		
 		proxy_ctx() {
 			TRACE_CLIENT_SIDE_CTX("proxy_ctx::proxy_ctx()");
 		}
@@ -44,6 +43,7 @@ namespace roger {
 		port_t dst_port;
 		std::string dst_domain;
 
+		wcp_timepoint_t http_tp_last_req;
 		WWRP<wawo::net::protocol::http::parser> http_req_parser;
 		stream_http_proxy_ctx_map_t	http_proxy_ctx_map;
 		WWSP<wawo::net::protocol::http::message> cur_req;
@@ -643,7 +643,9 @@ namespace roger {
 
 					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
 					TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]erase from ppctx", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
-					http_down(ppctx, NULL,true);
+					
+					
+					//http_down(ppctx, NULL, true );
 				} else {
 					pctx->stream_read_closed = true;
 					ctx_down(pctx, NULL);
@@ -779,15 +781,12 @@ namespace roger {
 			TRACE_CLIENT_SIDE_CTX("[roger][#%u]client read closed", ctx->ch->ch_id());
 			pctx->client_read_closed = true;
 
-			if (pctx->http_req_parser != NULL) {
-				WAWO_ASSERT(pctx->type == T_HTTP || pctx->type == T_HTTPS);
+			if (pctx->type == T_HTTP) {
 				WAWO_ASSERT(pctx->http_req_parser != NULL);
 				pctx->http_req_parser->deinit();
 				pctx->http_req_parser->ctx = NULL;
 				pctx->http_req_parser = NULL;
-			}
 
-			if (pctx->type == T_HTTP) {
 				std::for_each(pctx->http_proxy_ctx_map.begin(), pctx->http_proxy_ctx_map.end(), [](stream_http_proxy_ctx_pair_t const& pair) {
 					WWRP<proxy_ctx> _pctx = pair.second;
 					WAWO_ASSERT(_pctx->http_req_parser == NULL);
@@ -796,6 +795,8 @@ namespace roger {
 					_pctx->client_read_closed = true;
 					http_up(_pctx, NULL);
 				});
+
+				//schedule a TIMER to detect whether all the hosts that we requested before have been closed
 			} else {
 				ctx_up(pctx, NULL);
 			}

@@ -566,7 +566,7 @@ namespace roger {
 			else {
 
 				WWSP<wawo::net::protocol::http::message> _m = pctx->reqs.front();
-				if(_m->h.get("connection") == "close") {
+				if(_m->h.get("connection") == std::string("close")) {
 					WAWO_ASSERT(pctx->reqs.size() == 1);
 
 					pctx->client_read_closed = true;
