@@ -600,7 +600,7 @@ namespace roger {
 						WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>(64);
 						resp_connect_result_to_client(pctx, downp, code);
 
-						//in case client read closed first
+						//in case client read closed before stream established
 						if (pctx->client_read_closed == true) {
 							if (pctx->type == T_HTTP) {
 								http_up(pctx, NULL);
@@ -621,6 +621,7 @@ namespace roger {
 			pctx->ch_client_ctx->event_poller()->execute([pctx, ctx]() {
 				WAWO_ASSERT(pctx->ch_stream_ctx == ctx);
 				TRACE_CLIENT_SIDE_CTX("[roger][#%u][s%u]stream read closed", pctx->ch_client_ctx->ch->ch_id(), ctx->ch->ch_id() );
+				pctx->stream_read_closed = true;
 
 				if (pctx->type == T_HTTP) {
 					WWRP<proxy_ctx> ppctx = pctx->parent;
@@ -628,11 +629,11 @@ namespace roger {
 					WAWO_ASSERT(ppctx->type == T_HTTP);
 					WAWO_ASSERT(pctx->type == T_HTTP);
 					WAWO_ASSERT(pctx->parent != NULL);
-					pctx->stream_read_closed = true;
 					//@todo
 					//schedule another req
 					roger::cancel_all_ctx_reqs(pctx, CANCEL_CODE_SERVER_NO_RESPONSE);
 
+					//have to fake client read close to recycle stream
 					pctx->client_read_closed = true;
 					http_up(pctx, NULL);
 
@@ -644,10 +645,8 @@ namespace roger {
 					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
 					TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]erase from ppctx", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
 					
-					
 					//http_down(ppctx, NULL, true );
 				} else {
-					pctx->stream_read_closed = true;
 					ctx_down(pctx, NULL);
 				}
 			});

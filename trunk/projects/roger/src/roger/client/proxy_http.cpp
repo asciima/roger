@@ -569,6 +569,8 @@ namespace roger {
 				if(_m->h.get("connection") == std::string("close")) {
 					WAWO_ASSERT(pctx->reqs.size() == 1);
 
+					//fake a read close
+					//@TODO we'll exclude these kinds of session from http map 
 					pctx->client_read_closed = true;
 					http_up(pctx, NULL);
 					TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]req reach 0 and get connection close req: %s, set client read closed", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), _m->url.c_str());
