@@ -318,10 +318,6 @@ namespace roger {
 							resp_connect_result_to_client(_pctx, downp, rt);
 							
 							WAWO_ASSERT(_pctx->http_resp_parser == NULL);
-
-							//_pctx->http_resp_parser->deinit();
-							//_pctx->http_resp_parser->ctx = NULL;
-							//_pctx->http_resp_parser = NULL;
 							ppctx->http_proxy_ctx_map.erase(_HP_key);
 							ppctx->stream_read_closed = true;
 							http_down(ppctx, NULL);

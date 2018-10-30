@@ -10,8 +10,8 @@ namespace roger {
 	typedef std::pair <std::string, WWRP<proxy_ctx>> stream_http_proxy_ctx_pair_t;
 
 	typedef std::chrono::steady_clock roger_http_clock_t;
-	typedef std::chrono::time_point<roger_http_clock_t, std::chrono::seconds> roger_http_timepoint_t;
-	typedef std::chrono::seconds roger_http_dur_t;
+	typedef std::chrono::time_point<roger_http_clock_t, std::chrono::milliseconds> roger_http_timepoint_t;
+	typedef std::chrono::milliseconds roger_http_dur_t;
 
 	struct proxy_ctx :
 		public wawo::ref_base
@@ -361,16 +361,20 @@ namespace roger {
 	}
 
 	static inline void cancel_all_ctx_reqs(WWRP<proxy_ctx> const& pctx, int const& cancel_code) {
+		WAWO_ASSERT(pctx->type == T_HTTP);
 		while (pctx->reqs.size()) {
+
 			WAWO_ASSERT(cancel_code >= CANCEL_CODE_CONNECT_HOST_FAILED && cancel_code <= CANCEL_CODE_PROXY_PIPE_ERROR );
 			WAWO_ASSERT(cancel_code < http_request_cancel_code::HTTP_REQUEST_CANCEL_CODE_MAX);
-			WWRP<wawo::packet> http_reply = wawo::make_ref<wawo::packet>();
-			http_reply->write((wawo::byte_t*) HTTP_RESP_ERROR[cancel_code], wawo::strlen(HTTP_RESP_ERROR[cancel_code]));
+			
+			if (cancel_code != CANCEL_CODE_SERVER_NO_RESPONSE) {
+				WWRP<wawo::packet> http_reply = wawo::make_ref<wawo::packet>();
+				http_reply->write((wawo::byte_t*) HTTP_RESP_ERROR[cancel_code], wawo::strlen(HTTP_RESP_ERROR[cancel_code]));
 
-			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
-			pctx->ch_client_ctx->write(http_reply);
-
-			TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]http cancel req, code: %u, total resp count: %u, url: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), cancel_code, pctx->resp_count, pctx->reqs.front()->url.c_str());
+				WAWO_ASSERT(pctx->ch_client_ctx != NULL);
+				http_down(pctx, http_reply);
+				TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]http cancel req, code: %u, total resp count: %u, url: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), cancel_code, pctx->resp_count, pctx->reqs.front()->url.c_str());
+			}
 			pctx->reqs.pop();
 		}
 	}
