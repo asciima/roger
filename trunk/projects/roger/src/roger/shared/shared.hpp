@@ -20,7 +20,7 @@
 #endif
 
 //#define ENABLE_TRACE_SERVER_SIDE_CTX
-//#define ENABLE_TRACE_CLIENT_SIDE_CTX
+#define ENABLE_TRACE_CLIENT_SIDE_CTX
 #define DEBUG_HTTP_PROXY
 //#define ENABLE_TRACE_DNS_RESOLVE
 
@@ -68,8 +68,6 @@ namespace roger {
 		E_UNKNOWN_HTTP_METHOD = -9,
 		E_SOCKS5_UNSUPPORTED_CMD = -10
 	};
-
-
 
 	enum roger_cmd {
 		C_LOGIN,
@@ -251,11 +249,17 @@ namespace roger {
 	static const char HTTP_RESP_RELAY_SUCCEED[] =
 		"HTTP/1.1 200 Connection established\r\n\r\n";
 
+	static const char HTTP_RESP_PROXY_NOT_AVAILABLE_FAILED[] =
+		"HTTP/1.1 503 Service Unavailable\r\n"
+		"Content-Type: text/plain\r\n"
+		"Connection: close\r\n\r\n"
+		"ROGER: proxy server is currently unavailable\r\n";
+
 	static const char HTTP_RESP_BAD_REQUEST[] =
 		"HTTP/1.1 400 Bad request\r\n"
 		"Content-Type: text/plain\r\n"
 		"Connection: close\r\n\r\n"
-		"ROGER: Bad request\r\n";
+		"ROGER: bad request\r\n";
 
 	static const char HTTP_RESP_CONNECT_HOST_FAILED[] =
 		"HTTP/1.1 504 Connection timeout\r\n"
@@ -344,7 +348,8 @@ namespace roger {
 	enum http_conn_state {};
 
 	enum http_request_cancel_code {
-		CANCEL_CODE_CONNECT_HOST_FAILED=-0,
+		CANCEL_CODE_PROXY_NOT_AVAILABLE=-0,
+		CANCEL_CODE_CONNECT_HOST_FAILED,
 		CANCEL_CODE_CLIENT_BAD_REQUEST,
 		CANCEL_CODE_SERVER_NO_RESPONSE,
 		CANCEL_CODE_SERVER_RESPONSE_PARSE_ERROR,
@@ -354,6 +359,7 @@ namespace roger {
 
 	static const char* HTTP_RESP_ERROR[HTTP_REQUEST_CANCEL_CODE_MAX] =
 	{
+		HTTP_RESP_PROXY_NOT_AVAILABLE_FAILED,
 		HTTP_RESP_BAD_REQUEST,
 		HTTP_RESP_CONNECT_HOST_FAILED,
 		HTTP_RESP_SERVER_NO_RESPONSE,
