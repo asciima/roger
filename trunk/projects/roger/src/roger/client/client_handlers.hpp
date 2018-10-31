@@ -363,18 +363,22 @@ namespace roger {
 	static inline void cancel_all_ctx_reqs(WWRP<proxy_ctx> const& pctx, int const& cancel_code) {
 		WAWO_ASSERT(pctx->type == T_HTTP);
 		while (pctx->reqs.size()) {
-
-			WAWO_ASSERT(cancel_code >= CANCEL_CODE_CONNECT_HOST_FAILED && cancel_code <= CANCEL_CODE_PROXY_PIPE_ERROR );
-			WAWO_ASSERT(cancel_code < http_request_cancel_code::HTTP_REQUEST_CANCEL_CODE_MAX);
-			
-			if (cancel_code != CANCEL_CODE_SERVER_NO_RESPONSE) {
-				WWRP<wawo::packet> http_reply = wawo::make_ref<wawo::packet>();
-				http_reply->write((wawo::byte_t*) HTTP_RESP_ERROR[cancel_code], wawo::strlen(HTTP_RESP_ERROR[cancel_code]));
-
-				WAWO_ASSERT(pctx->ch_client_ctx != NULL);
-				http_down(pctx, http_reply);
-				TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]http cancel req, code: %u, total resp count: %u, url: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), cancel_code, pctx->resp_count, pctx->reqs.front()->url.c_str());
+			if (cancel_code == CANCEL_CODE_SERVER_NO_RESPONSE) {
+				pctx->reqs.pop();
+				continue;
 			}
+
+			WWRP<wawo::packet> http_reply = wawo::make_ref<wawo::packet>();
+			if (cancel_code >= CANCEL_CODE_PROXY_NOT_AVAILABLE && cancel_code <= CANCEL_CODE_PROXY_PIPE_ERROR) {
+				http_reply->write((wawo::byte_t*) HTTP_RESP_ERROR[cancel_code], wawo::strlen(HTTP_RESP_ERROR[cancel_code]));
+			} else {
+				http_reply->write((wawo::byte_t*) HTTP_RESP_ERROR[CANCEL_CODE_PROXY_PIPE_ERROR], wawo::strlen(HTTP_RESP_ERROR[CANCEL_CODE_PROXY_PIPE_ERROR]));
+			}
+
+			WAWO_ASSERT(pctx->parent != NULL);
+			http_down(pctx->parent, http_reply);
+			TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]http cancel req, code: %u, total resp count: %u, url: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), cancel_code, pctx->resp_count, pctx->reqs.front()->url.c_str());
+
 			pctx->reqs.pop();
 		}
 	}
@@ -779,7 +783,6 @@ namespace roger {
 					WWRP<proxy_ctx> _pctx = pair.second;
 					WAWO_ASSERT(_pctx->http_req_parser == NULL);
 
-					WAWO_ASSERT(_pctx->parent != NULL);
 					_pctx->client_read_closed = true;
 					http_up(_pctx, NULL);
 				});
@@ -815,8 +818,9 @@ namespace roger {
 			if (ppctx->ch_stream_ctx != NULL) {
 				ppctx->ch_stream_ctx->ch->ch_async_io_begin_read();
 			}
+			//TRY TO FLUSH IF NECESSARY
 			if (ppctx->type == T_HTTP) {
-				http_down(ppctx, NULL ); //JUST TRY TO FLUSH
+				http_down(ppctx, NULL );
 			}
 			else {
 				ctx_down(ppctx, NULL);
@@ -854,11 +858,11 @@ namespace roger {
 					ppctx->state = SOCKS4_PARSE;
 				} else {
 					int detect_rt = _detect_http_proxy(ppctx);
-					if (detect_rt > 0) {
+					if (detect_rt == E_WAIT_BYTES_ARRIVE ) {
 						goto _end_check;
 					}
-					else if (detect_rt < 0) {
-						WAWO_ERR("[client][#%u]unknown proxy type", ppctx->ch_client_ctx->ch->ch_id() );
+					else if (detect_rt == E_UNKNOWN_HTTP_METHOD) {
+						WAWO_ERR("[client][#%u]unknown proxy type, force close", ppctx->ch_client_ctx->ch->ch_id() );
 						ppctx->ch_client_ctx->close();
 						goto _end_check;
 					} else {
@@ -874,22 +878,10 @@ namespace roger {
 								if (ppctx->stream_read_closed == true) {
 									return;
 								}
-
-								bool force_close_http_client = false;
-								if (ppctx->http_proxy_ctx_map.size() == 0) {
-									force_close_http_client = true;
-								} else {
-									stream_http_proxy_ctx_map_t::iterator _it = std::find_if(ppctx->http_proxy_ctx_map.begin(), ppctx->http_proxy_ctx_map.end(), [](stream_http_proxy_ctx_pair_t const& pair) {
-										return pair.second->reqs.size() != 0;
-									});
-									force_close_http_client = (_it == ppctx->http_proxy_ctx_map.end());
-								}
-
-								if (force_close_http_client == false) {
+								if (ppctx->http_proxy_ctx_map.size() != 0) {
 									ppctx->ch_client_ctx->event_poller()->start_timer(t);
 									return;
 								}
-
 								const roger_http_timepoint_t now = std::chrono::time_point_cast<roger_http_dur_t>(roger_http_clock_t::now());
 								const roger_http_dur_t diff = now - ppctx->http_tp_last_req;
 								if (diff.count() < 30) {
@@ -974,6 +966,7 @@ namespace roger {
 			break;
 			case PIPE_PREPARE:
 			{
+				WAWO_ASSERT(ppctx->type != T_HTTP);
 				if (ppctx->address_type == HOST && wawo::net::is_dotipv4_decimal_notation(ppctx->dst_domain.c_str())) {
 					wawo::net::ipv4_t _ip;
 					int crt = wawo::net::dotiptoip(ppctx->dst_domain.c_str(), _ip);

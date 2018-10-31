@@ -97,7 +97,6 @@ namespace roger {
 		}
 
 		pctx->protocol_packet->peek(method, WAWO_HTTP_METHOD_NAME_MAX_LEN);
-
 		byte_t upper[WAWO_HTTP_METHOD_NAME_MAX_LEN];
 		wawo::strtoupper((char*)upper, WAWO_HTTP_METHOD_NAME_MAX_LEN, (char*)method);
 
@@ -260,7 +259,11 @@ namespace roger {
 				if (mux_ == NULL) {
 					WAWO_ERR("[client][#%u]no mux connected", ppctx->ch_client_ctx->ch->ch_id());
 					ppctx->state = PIPE_DIAL_STREAM_FAILED;
-					ppctx->ch_client_ctx->close();
+					WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>();
+					resp_connect_result_to_client(ppctx, downp, CANCEL_CODE_PROXY_NOT_AVAILABLE);
+					//force close ch_client
+					ppctx->stream_read_closed = true;
+					http_down(ppctx, NULL);
 					return WAWO_NEGATIVE(HPE_UNKNOWN);
 				}
 
@@ -311,16 +314,14 @@ namespace roger {
 					_pctx->ch_client_ctx->ch->event_poller()->execute([_HP_key,sid,rt,_pctx, ppctx]() {
 						if (rt == wawo::OK) {
 							_pctx->state = PIPE_DIAL_STREAM_OK;
-						} else {
+						} else { 
 							_pctx->state = PIPE_DIAL_STREAM_FAILED;
 							WAWO_INFO("[client][#%u]dial mux_stream failed:%d, domain: %s:%u", sid, rt, _pctx->dst_domain.c_str(), _pctx->dst_port);
 							WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>();
-							resp_connect_result_to_client(_pctx, downp, rt);
+							resp_connect_result_to_client(_pctx, downp, CANCEL_CODE_PROXY_NOT_AVAILABLE);
 							
 							WAWO_ASSERT(_pctx->http_resp_parser == NULL);
 							ppctx->http_proxy_ctx_map.erase(_HP_key);
-							ppctx->stream_read_closed = true;
-							http_down(ppctx, NULL);
 						}
 					});
 				});
