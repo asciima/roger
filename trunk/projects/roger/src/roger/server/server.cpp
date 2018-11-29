@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
 	WAWO_INFO("[roger]listen on %s", listenurl.c_str() );
 
 	App.run();
-
+	lch->channel()->ch_close();
 	roger::dns_resolver::instance()->deinit();
 	WAWO_INFO("[roger]server exiting...");
 	return 0;

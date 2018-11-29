@@ -18,7 +18,7 @@
 					<Add option="-DDEBUG" />
 				</Compiler>
 				<Linker>
-					<Add library="../../../../../libs/wawo/svn/wawo/projects/codeblocks/wawo/bin/Debug/libwawo.a" />
+					<Add library="../../../../../libs/wawo/projects/codeblocks/wawo/bin/Debug/libwawo.a" />
 					<Add library="../../../../../libs/udns/udns-0.4/codeblocks/udns/bin/Debug/libudns.a" />
 				</Linker>
 			</Target>
