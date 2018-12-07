@@ -112,7 +112,9 @@ namespace roger {
 		fctx->down_state = ctx_write_state::WS_IDLE;
 		if (flushrt == wawo::OK) {
 			WAWO_ASSERT(fctx->down_to_stream_packets.size());
+			fctx->ndownbytes += fctx->down_to_stream_packets.front()->len();
 			fctx->down_to_stream_packets.pop();
+
 			_do_flush_down(fctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
@@ -121,6 +123,7 @@ namespace roger {
 			if (fctx->ch_server_ctx != NULL) {
 				fctx->ch_server_ctx->shutdown_read();
 			}
+			TRACE_SERVER_SIDE_CTX("[server][s%u]write to stream failed: %d", fctx->ch_stream_ctx->ch->ch_id(), flushrt );
 			fctx->ch_stream_ctx->close();
 		}
 	}

@@ -21,10 +21,10 @@
 
 //#define ENABLE_TRACE_SERVER_SIDE_CTX
 #define ENABLE_TRACE_CLIENT_SIDE_CTX
-#define DEBUG_HTTP_PROXY
+#define ENABLE_DEBUG_HTTP_PROXY
 //#define ENABLE_TRACE_DNS_RESOLVE
 
-#ifdef DEBUG_HTTP_PROXY
+#ifdef ENABLE_DEBUG_HTTP_PROXY
 	#define TRACE_HTTP_PROXY WAWO_INFO
 #else
 	#define TRACE_HTTP_PROXY(...)
@@ -307,7 +307,7 @@ namespace roger {
 	struct forward_ctx :
 		public wawo::ref_base
 	{
-		forward_ctx() {
+		forward_ctx():ndownbytes(0) {
 			TRACE_SERVER_SIDE_CTX("forward_ctx::forward_ctx()");
 		}
 		~forward_ctx() {
@@ -320,7 +320,7 @@ namespace roger {
 		WWRP<wawo::packet> client_up_first_packet; //first req packet
 		packet_queue up_to_server_packets;
 		packet_queue down_to_stream_packets;
-
+		u32_t ndownbytes;
 		server_state state;
 		ctx_write_state up_state;
 		ctx_write_state down_state;

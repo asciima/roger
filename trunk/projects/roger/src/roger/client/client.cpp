@@ -38,23 +38,10 @@
 	//std::string dialurl = "tcp://127.0.0.1:8082";
 	roger::mux_pool::instance()->init(dialurl);
 	WAWO_INFO("server url: %s", dialurl.c_str());
-connect_mux:
-	WWRP < wawo::net::channel_future> dial_f = wawo::net::socket::dial(dialurl, [](WWRP<wawo::net::channel> const& ch) {
-		WWRP<wawo::net::channel_handler_abstract> h_hlen = wawo::make_ref<wawo::net::handler::hlen>();
-		ch->pipeline()->add_last(h_hlen);
 
-		WWRP<wawo::net::channel_handler_abstract> h_dh_symmetric = wawo::make_ref<wawo::net::handler::dh_symmetric_encrypt>();
-		ch->pipeline()->add_last(h_dh_symmetric);
-
-		WWRP<wawo::net::handler::mux> h_mux = wawo::make_ref<wawo::net::handler::mux>();
-		h_mux->bind<wawo::net::handler::fn_mux_evt_t>(wawo::net::handler::E_MUX_CH_CONNECTED, &roger::mux_pool::connected, roger::mux_pool::instance(), std::placeholders::_1);
-
-		ch->pipeline()->add_last(h_mux);
-	}, roger::mux_cfg);
-
-	if (dial_f->get() != wawo::OK) {
+	roger::mux_pool::instance()->dial_one_mux();
+	while (roger::mux_pool::instance()->count() == 0) {
 		wawo::this_thread::sleep(1000);
-		goto connect_mux;
 	}
 
 	std::string listenurl = "tcp://0.0.0.0:12122";
