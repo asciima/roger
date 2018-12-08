@@ -20,8 +20,8 @@
 #endif
 
 //#define ENABLE_TRACE_SERVER_SIDE_CTX
-#define ENABLE_TRACE_CLIENT_SIDE_CTX
-#define ENABLE_DEBUG_HTTP_PROXY
+//#define ENABLE_TRACE_CLIENT_SIDE_CTX
+//#define ENABLE_DEBUG_HTTP_PROXY
 //#define ENABLE_TRACE_DNS_RESOLVE
 
 #ifdef ENABLE_DEBUG_HTTP_PROXY
@@ -367,10 +367,9 @@ namespace roger {
 		HTTP_RESP_PROXY_PIPE_ERROR
 	};
 
-	const static wawo::net::socket_cfg mux_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 1024*1024,1024*1024 }, default_keep_alive_vals);
+	const static wawo::net::socket_cfg mux_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 2*1024*1024,2*1024*1024 }, default_keep_alive_vals);
 	const static wawo::net::socket_buffer_cfg mux_stream_sbc = { 1024*1024,1024*1024 };
 
-//	const static wawo::u32_t client_req_buffer_size = (256 * 1024 + 5);
 	const static wawo::net::socket_cfg client_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 256 * 1024,256 * 1024 }, default_keep_alive_vals);
 	const static wawo::net::socket_cfg server_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 256 * 1024,256 * 1024 }, default_keep_alive_vals);
 

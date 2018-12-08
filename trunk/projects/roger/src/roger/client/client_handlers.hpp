@@ -516,9 +516,10 @@ namespace roger {
 
 			dial_f->add_listener([P=this](WWRP<wawo::net::channel_future> const& f) {
 				if (f->get() != wawo::OK) {
-					io_event_loop_group::instance()->schedule([P]() {
-						P->dial_one_mux();
+					WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(2), [](WWRP<timer> const& t) {
+						mux_pool::instance()->dial_one_mux();
 					});
+					wawo::global_timer_manager::instance()->start(t_dial);
 				}
 			});
 		}
@@ -527,6 +528,13 @@ namespace roger {
 		{
 			wawo::lock_guard<wawo::spin_mutex> lg(m_mutex);
 			m_muxs.push_back(mux_);
+		}
+
+		void error(WWRP < wawo::net::handler::mux> const& mux_) {
+			WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(2), [](WWRP<timer> const& t) {
+				mux_pool::instance()->dial_one_mux();
+			});
+			wawo::global_timer_manager::instance()->start(t_dial);
 		}
 
 		void closed(WWRP<wawo::net::handler::mux> const& mux_)
@@ -540,10 +548,10 @@ namespace roger {
 				}
 				++it;
 			}
-			WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(1), [](WWRP<timer> const& t) {
+			WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(2), [](WWRP<timer> const& t) {
 				mux_pool::instance()->dial_one_mux();
 			});
-			//connect new
+			wawo::global_timer_manager::instance()->start(t_dial);
 		}
 
 		WWRP<wawo::net::handler::mux> next() {
