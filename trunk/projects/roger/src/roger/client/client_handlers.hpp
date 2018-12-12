@@ -445,20 +445,19 @@ namespace roger {
 		break;
 		case T_HTTP:
 		{
-			if (rcode != wawo::OK) {
+			if (rcode == wawo::OK) {
+				int ec = http_parse_down(pctx, downp);
+				if (ec != wawo::OK) {
+					cancel_all_ctx_reqs(pctx, CANCEL_CODE_SERVER_RESPONSE_PARSE_ERROR);
+					pctx->ch_stream_ctx->close();
+				}
+			} else {
 				WAWO_ASSERT(downp->len() == 0);
 				WAWO_ASSERT(pctx->reqs.size() != 0);
 				WWSP<wawo::net::protocol::http::message>& m = pctx->reqs.front();
 				WAWO_WARN("[roger][https]connect to url: %s failed for: %d, cancel reqs: %u", m->url.c_str(), rcode, pctx->reqs.size());
 				cancel_all_ctx_reqs(pctx, CANCEL_CODE_CONNECT_HOST_FAILED);
 				WAWO_ASSERT(pctx->reqs.size() == 0);
-			}
-			else {
-				int ec = http_parse_down(pctx, downp);
-				if (ec != wawo::OK) {
-					cancel_all_ctx_reqs(pctx, CANCEL_CODE_SERVER_RESPONSE_PARSE_ERROR);
-					pctx->ch_stream_ctx->close();
-				}
 			}
 		}
 		break;
