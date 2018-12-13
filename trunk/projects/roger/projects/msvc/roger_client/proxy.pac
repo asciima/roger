@@ -12222,7 +12222,7 @@ var domains = {
   "zyzc9.com": 1
 };
 
-var proxy = "PROXY_TYPE ROGER_HTTP_SERVER_ADDR:12122";
+var proxy = "PROXY_TYPE ROGER_HTTP_SERVER_ADDR:12122; DIRECT;";
 var direct = 'DIRECT;';
 
 var hasOwnProperty = Object.hasOwnProperty;
@@ -12280,14 +12280,19 @@ function testDomain(target, domains, cnRootIncluded) {
 }
 
 function FindProxyForURL(url, host) {
-    if (isPlainHostName(host)
-     || host === '127.0.0.1'
-     || host === 'localhost' 
-	 || host === 'ROGER_HTTP_SERVER_ADDR' )
+	if (isPlainHostName(host) ||
+		host === '127.0.0.1'||
+		host === 'localhost' ||
+		isInNet(dnsResolve(host), "10.0.0.0", "255.0.0.0") ||
+		isInNet(dnsResolve(host), "172.16.0.0",  "255.240.0.0") ||
+		isInNet(dnsResolve(host), "192.168.0.0", "255.255.0.0") ||
+		isInNet(dnsResolve(host), "100.64.0.0", "255.255.0.0") ||
+		isInNet(dnsResolve(host), "127.0.0.0", "255.255.255.0")
+	)
 	{
-        return direct;
-    }
-
+		return direct;
+	}
+	
     if (!ipRegExp.test(host)) {
         if (testDomain(host, directDomains, true)) {
             return direct

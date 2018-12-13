@@ -1006,7 +1006,15 @@ namespace roger {
 
 				int ec;
 				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid,ec);
-				WAWO_ASSERT(ec == wawo::OK);
+				if (ec != wawo::OK) {
+					ppctx->state = PIPE_DIAL_STREAM_FAILED;
+					WWRP<packet> downp = wawo::make_ref<packet>(64);
+					resp_connect_result_to_client(ppctx, downp, ec);
+					ppctx->ch_client_ctx->close();
+					WAWO_INFO("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
+						, sid, ec, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
+					return;
+				}
 
 				WWRP<wawo::net::channel_promise> dial_f = muxs->make_promise();
 				dial_f->add_listener([ppctx, sid](WWRP<wawo::net::channel_future> const& f) {
