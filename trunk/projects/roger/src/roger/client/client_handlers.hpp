@@ -603,19 +603,20 @@ namespace roger {
 				f->add_listener([pctx](WWRP<wawo::net::channel_future> const& f) {
 					const int code = f->get();
 					if (code != wawo::OK) {
-						pctx->state = PIPE_DIAL_SERVER_FAILED;
-						WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>(64);
-						resp_connect_result_to_client(pctx, downp, code);
-
-						//in case client read closed before stream established
-						if (pctx->client_read_closed == true) {
-							if (pctx->type == T_HTTP) {
-								http_up(pctx, NULL);
-							} else {
-								ctx_up(pctx, NULL);
+						pctx->ch_client_ctx->event_poller()->execute([pctx, code]() {
+							pctx->state = PIPE_DIAL_SERVER_FAILED;
+							WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>(64);
+							resp_connect_result_to_client(pctx, downp, code);
+							//in case client read closed before stream established
+							if (pctx->client_read_closed == true) {
+								if (pctx->type == T_HTTP) {
+									http_up(pctx, NULL);
+								} else {
+									ctx_up(pctx, NULL);
+								}
 							}
-						}
-						WAWO_WARN("[client][#%u][s%u][%s][%s:%u]send connect cmd failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code);
+							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]send connect cmd failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code);
+						});
 					}
 				});
 			});
