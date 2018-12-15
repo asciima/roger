@@ -78,11 +78,10 @@ namespace roger {
 			outp->write((byte_t*)"?", 1);
 			outp->write((byte_t*)m->urlfields.query.c_str(), m->urlfields.query.length());
 		}
-		outp->write((wawo::byte_t*)WAWO_HTTP_SP, wawo::strlen(WAWO_HTTP_SP));
 
-		char tmp[16] = { 0 };
-		int n = snprintf(tmp, 16, " HTTP/%d.%d\r\n", m->ver.major, m->ver.minor);
-		WAWO_ASSERT(n > 0 && n < 16);
+		char tmp[32];
+		int n = snprintf(tmp, 32, " HTTP/%d.%d\r\n", m->ver.major, m->ver.minor);
+		WAWO_ASSERT(n > 0 && n < 32);
 		outp->write((byte_t*)tmp, n);
 		outp->write(H->begin(), H->len());
 
