@@ -64,30 +64,29 @@ namespace roger {
 		return _t;
 	}
 
-	inline void encode_http_header(WWSP<wawo::net::protocol::http::message> const& m, WWRP<wawo::packet>& o) {
-		char request_line[8192] = { 0 };
-		int nrequest;
-		if (m->urlfields.query.length()) {
-			nrequest = snprintf(request_line, 8192, "%s %s?%s HTTP/%d.%d\r\n"
-				, roger::option_name_str[m->opt]
-				, m->urlfields.path.c_str()
-				, m->urlfields.query.c_str()
-				, m->ver.major
-				, m->ver.minor);
-		} else {
-			nrequest = snprintf(request_line, 8192, "%s %s HTTP/%d.%d\r\n"
-				, roger::option_name_str[m->opt]
-				, m->urlfields.path.c_str()
-				, m->ver.major
-				, m->ver.minor);
-		}
-
-		WAWO_ASSERT((nrequest > 0) && nrequest<8192);
-
+	inline void encode_http_request_header(WWSP<wawo::net::protocol::http::message> const& m, WWRP<wawo::packet>& o) {
 		WWRP<packet> H;
 		m->h.encode(H);
-		H->write_left((byte_t*)request_line, nrequest);
-		o = H;
+		H->write((wawo::byte_t*)WAWO_HTTP_CRLF, (wawo::u32_t)wawo::strlen(WAWO_HTTP_CRLF));
+
+		WWRP<packet> outp = wawo::make_ref<wawo::packet>( m->url.length() + 32 );
+
+		outp->write((wawo::byte_t*)roger::option_name_str[m->opt],wawo::strlen(roger::option_name_str[m->opt]));
+		outp->write((wawo::byte_t*)WAWO_HTTP_SP, wawo::strlen(WAWO_HTTP_SP) );
+		outp->write((wawo::byte_t*)m->urlfields.path.c_str(), m->urlfields.path.length());
+		if (m->urlfields.query.length()) {
+			outp->write((byte_t*)"?", 1);
+			outp->write((byte_t*)m->urlfields.query.c_str(), m->urlfields.query.length());
+		}
+		outp->write((wawo::byte_t*)WAWO_HTTP_SP, wawo::strlen(WAWO_HTTP_SP));
+
+		char tmp[16] = { 0 };
+		int n = snprintf(tmp, 16, " HTTP/%d.%d\r\n", m->ver.major, m->ver.minor);
+		WAWO_ASSERT(n > 0 && n < 16);
+		outp->write((byte_t*)tmp, n);
+		outp->write(H->begin(), H->len());
+
+		o = outp;
 	}
 
 	int _detect_http_proxy(WWRP<proxy_ctx> const& pctx) {
@@ -338,7 +337,7 @@ namespace roger {
 			ppctx->http_tp_last_req = std::chrono::time_point_cast<roger_http_dur_t>(roger_http_clock_t::now());
 
 			WWRP<wawo::packet> H;
-			encode_http_header(ppctx->cur_req, H);
+			encode_http_request_header(ppctx->cur_req, H);
 			http_up(ppctx->cur_req_ctx, H);
 
 			TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]push req, %s, header: \n%s", ppctx->ch_client_ctx->ch->ch_id(), ppctx->cur_req_ctx->stream_id, ppctx->cur_req_ctx->HP_key.c_str(), ppctx->cur_req->url.c_str(), std::string((char*)H->begin(),H->len()).c_str() );
@@ -502,10 +501,10 @@ namespace roger {
 
 			WWRP<packet> H;
 			pctx->cur_resp->h.encode(H);
-
-			char resp_status[4096] = { 0 };
-			int nresp = snprintf(resp_status, 4096, "HTTP/%d.%d %u %s\r\n", pctx->cur_resp->ver.major, pctx->cur_resp->ver.minor, pctx->cur_resp->status_code, pctx->cur_resp->status.c_str());
-			WAWO_ASSERT(nresp > 0 && nresp < 4096);
+			H->write((wawo::byte_t*)WAWO_HTTP_CRLF, (wawo::u32_t)wawo::strlen(WAWO_HTTP_CRLF));
+			char resp_status[2048] = { 0 };
+			int nresp = snprintf(resp_status, 2048, "HTTP/%d.%d %u %s\r\n", pctx->cur_resp->ver.major, pctx->cur_resp->ver.minor, pctx->cur_resp->status_code, pctx->cur_resp->status.c_str());
+			WAWO_ASSERT(nresp > 0 && nresp < 2048);
 
 			H->write_left((byte_t*)resp_status, nresp);
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);

@@ -54,7 +54,7 @@
 	WWRP<wawo::net::channel_future> http_listen_f = wawo::net::socket::listen_on(http_listenurl, [](WWRP<wawo::net::channel> const& ch) {
 		WWRP<roger::http_server_handler> https = wawo::make_ref<roger::http_server_handler>();
 		WWRP<wawo::net::handler::http> h = wawo::make_ref<wawo::net::handler::http>();
-		h->bind<wawo::net::handler::fn_http_message_header_end_t>(wawo::net::handler::http_event::E_HEADER_COMPLETE, &roger::http_server_handler::on_request, https, std::placeholders::_1, std::placeholders::_2);
+		h->bind<wawo::net::handler::fn_http_message_header_end_t>(wawo::net::handler::http_event::E_MESSAGE_HEADER_END, &roger::http_server_handler::on_request, https, std::placeholders::_1, std::placeholders::_2);
 		ch->pipeline()->add_last(h);
 	}, roger::http_server_cfg);
 
