@@ -511,6 +511,7 @@ namespace roger {
 				WWRP<wawo::net::handler::mux> h_mux = wawo::make_ref<wawo::net::handler::mux>();
 				h_mux->bind<wawo::net::handler::fn_mux_evt_t>(wawo::net::handler::E_MUX_CH_CONNECTED, &roger::mux_pool::connected, roger::mux_pool::instance(), std::placeholders::_1);
 				h_mux->bind<wawo::net::handler::fn_mux_evt_t>(wawo::net::handler::E_MUX_CH_CLOSED, &roger::mux_pool::closed, roger::mux_pool::instance(), std::placeholders::_1);
+				h_mux->bind<wawo::net::handler::fn_mux_evt_t>(wawo::net::handler::E_MUX_CH_ERROR, &roger::mux_pool::error, roger::mux_pool::instance(), std::placeholders::_1);
 
 				ch->pipeline()->add_last(h_mux);
 			}, roger::mux_cfg );
