@@ -293,7 +293,7 @@ namespace roger {
 		"ROGER: client closed the connection before server respond";
 	*/
 
-	typedef std::queue< WWSP<wawo::net::protocol::http::message> > message_queue;
+	typedef std::queue< WWRP<wawo::net::http::message> > message_queue;
 	typedef std::queue< WWRP<wawo::packet> > packet_queue;
 
 	struct async_dns_query;

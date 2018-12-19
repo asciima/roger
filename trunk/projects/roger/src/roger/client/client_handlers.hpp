@@ -4,7 +4,7 @@
 
 
 namespace roger {
-	using namespace wawo::net::protocol::http;
+	using namespace wawo::net::http;
 
 	typedef std::unordered_map <std::string, WWRP<proxy_ctx> > stream_http_proxy_ctx_map_t;
 	typedef std::pair <std::string, WWRP<proxy_ctx>> stream_http_proxy_ctx_pair_t;
@@ -48,14 +48,14 @@ namespace roger {
 		std::string dst_domain;
 
 		roger_http_timepoint_t http_tp_last_req;
-		WWRP<wawo::net::protocol::http::parser> http_req_parser;
+		WWRP<wawo::net::http::parser> http_req_parser;
 		stream_http_proxy_ctx_map_t	http_proxy_ctx_map;
 
-		WWSP<wawo::net::protocol::http::message> cur_req;
+		WWRP<wawo::net::http::message> cur_req;
 		WWRP<proxy_ctx> cur_req_ctx;
 
-		WWRP<wawo::net::protocol::http::parser> http_resp_parser;
-		WWSP<wawo::net::protocol::http::message> cur_resp;
+		WWRP<wawo::net::http::parser> http_resp_parser;
+		WWRP<wawo::net::http::message> cur_resp;
 
 		std::string resp_http_field_tmp;
 
@@ -264,8 +264,8 @@ namespace roger {
 	}
 
 	static inline WWRP<parser> make_http_req_parser() {
-		WWRP<parser> _p = wawo::make_ref<wawo::net::protocol::http::parser>();
-		_p->init(wawo::net::protocol::http::PARSER_REQ);
+		WWRP<parser> _p = wawo::make_ref<wawo::net::http::parser>();
+		_p->init(wawo::net::http::HPT_REQ);
 
 		_p->on_message_begin = http_req::on_message_begin;
 		_p->on_url = http_req::on_url;
@@ -282,8 +282,8 @@ namespace roger {
 	}
 
 	static inline WWRP<parser> make_http_resp_parser() {
-		WWRP<parser> _p = wawo::make_ref<wawo::net::protocol::http::parser>();
-		_p->init(PARSER_RESP);
+		WWRP<parser> _p = wawo::make_ref<wawo::net::http::parser>();
+		_p->init(wawo::net::http::HPT_RESP);
 
 		_p->on_message_begin = http_resp::on_message_begin;
 		_p->on_status = http_resp::on_status;
@@ -455,7 +455,7 @@ namespace roger {
 			} else {
 				WAWO_ASSERT(downp->len() == 0);
 				if (pctx->reqs.size()) {
-					WWSP<wawo::net::protocol::http::message>& m = pctx->reqs.front();
+					WWRP<wawo::net::http::message>& m = pctx->reqs.front();
 					WAWO_WARN("[roger][https]connect to url: %s failed for: %d, cancel reqs: %u", m->url.c_str(), rcode, pctx->reqs.size());
 					cancel_all_ctx_reqs(pctx, CANCEL_CODE_CONNECT_HOST_FAILED);
 					WAWO_ASSERT(pctx->reqs.size() == 0);
@@ -1170,8 +1170,8 @@ namespace roger {
 	{
 
 	public:
-		void on_request(WWRP<wawo::net::channel_handler_context> const& ctx, WWSP<wawo::net::protocol::http::message> const& m) {
-			WAWO_ASSERT(m->type == wawo::net::protocol::http::T_REQ);
+		void on_request(WWRP<wawo::net::channel_handler_context> const& ctx, WWRP<wawo::net::http::message> const& m) {
+			WAWO_ASSERT(m->type == wawo::net::http::T_REQ);
 			WAWO_INFO("[http_server]request uri: %s", m->url.c_str());
 
 			std::string proxy_type = std::string("PROXY");
@@ -1180,12 +1180,13 @@ namespace roger {
 				proxy_type = std::string("SOCKS5");
 			}
 
-			WWSP<wawo::net::protocol::http::message> resp = wawo::make_shared<wawo::net::protocol::http::message>();
-			resp->type = wawo::net::protocol::http::T_RESP;
+			WWRP<wawo::net::http::message> resp = wawo::make_ref<wawo::net::http::message>();
+			resp->H = wawo::make_ref<wawo::net::http::header>();
+			resp->type = wawo::net::http::T_RESP;
 
 			resp->ver = { 1,1 };;
-			resp->h.set("Content-Type", "application/x-ns-proxy-autoconfig");
-			resp->h.set("Connection", "close");
+			resp->H->set("Content-Type", "application/x-ns-proxy-autoconfig");
+			resp->H->set("Connection", "close");
 
 			std::string pac_file_content;
 			int load_rt = load_file_into_len_cstr(pac_file_content, "proxy.pac");
@@ -1212,7 +1213,7 @@ namespace roger {
 			}
 			else {
 
-				std::string host = m->h.get("Host");
+				std::string host = m->H->get("Host");
 
 				if (host.length() == 0) {
 					resp->status_code = 403;
