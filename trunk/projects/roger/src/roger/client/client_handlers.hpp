@@ -126,7 +126,7 @@ namespace roger {
 				} else {
 					if (ctx->client_read_closed == true) {
 						if (ctx->ch_stream_ctx != NULL) {
-							ctx->ch_stream_ctx->shutdown_write();
+							ctx->ch_stream_ctx->close_write();
 						}
 					}
 				}
@@ -136,7 +136,7 @@ namespace roger {
 			{
 				WAWO_ASSERT(ctx->client_read_closed == true);
 				WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
-				ctx->ch_stream_ctx->shutdown_write();
+				ctx->ch_stream_ctx->close_write();
 			}
 			break;
 			default:
@@ -161,7 +161,7 @@ namespace roger {
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
 		}
 		else {
-			ctx->ch_client_ctx->shutdown_read();
+			ctx->ch_client_ctx->close_read();
 			ctx->ch_stream_ctx->close();
 		}
 	}
@@ -196,7 +196,7 @@ namespace roger {
 		else {
 			if (ctx->stream_read_closed) {
 				TRACE_CLIENT_SIDE_CTX("[client][#%u]stream read closed, close client write", ctx->ch_client_ctx->ch->ch_id() );
-				ctx->ch_client_ctx->shutdown_write();
+				ctx->ch_client_ctx->close_write();
 			}
 		}
 	}
@@ -216,7 +216,7 @@ namespace roger {
 		}
 		else {
 			if (ctx->ch_stream_ctx != NULL) {
-				ctx->ch_stream_ctx->shutdown_read();
+				ctx->ch_stream_ctx->close_read();
 			}
 			ctx->ch_client_ctx->close();
 		}
@@ -625,7 +625,7 @@ namespace roger {
 			});
 		}
 
-		void read_shutdowned(WWRP<wawo::net::channel_handler_context> const& ctx) {
+		void read_closed(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
 			WAWO_ASSERT(pctx != NULL);
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
@@ -784,7 +784,7 @@ namespace roger {
 			TRACE_CLIENT_SIDE_CTX("[roger][#%u]client connected", ctx->ch->ch_id());
 		}
 
-		void read_shutdowned(WWRP<wawo::net::channel_handler_context> const& ctx) {
+		void read_closed(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WWRP<proxy_ctx> ppctx = ctx->ch->get_ctx<proxy_ctx>();
 			WAWO_ASSERT(ppctx != NULL);
 			TRACE_CLIENT_SIDE_CTX("[roger][#%u]client read closed", ctx->ch->ch_id());
