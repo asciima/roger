@@ -39,7 +39,7 @@ namespace roger {
 				else {
 					if (fctx->stream_read_closed) {
 						TRACE_SERVER_SIDE_CTX("[server][s%u]no up to server packets left and stream read closed, close server write", fctx->ch_stream_ctx->ch->ch_id());
-						fctx->ch_server_ctx->shutdown_write();
+						fctx->ch_server_ctx->close_write();
 					}
 				}
 			}
@@ -66,7 +66,7 @@ namespace roger {
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
 		}
 		else {
-			fctx->ch_stream_ctx->shutdown_read();
+			fctx->ch_stream_ctx->close_read();
 			fctx->ch_server_ctx->close();
 		}
 	}
@@ -101,7 +101,7 @@ namespace roger {
 			if (fctx->server_read_closed) {
 				TRACE_SERVER_SIDE_CTX("[server][s%u]no down packets left and server_read_closed, close stream write", fctx->ch_stream_ctx->ch->ch_id());
 				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
-				fctx->ch_stream_ctx->shutdown_write();
+				fctx->ch_stream_ctx->close_write();
 			}
 		}
 	}
@@ -121,7 +121,7 @@ namespace roger {
 		}
 		else {
 			if (fctx->ch_server_ctx != NULL) {
-				fctx->ch_server_ctx->shutdown_read();
+				fctx->ch_server_ctx->close_read();
 			}
 			TRACE_SERVER_SIDE_CTX("[server][s%u]write to stream failed: %d", fctx->ch_stream_ctx->ch->ch_id(), flushrt );
 			fctx->ch_stream_ctx->close();
@@ -168,13 +168,13 @@ namespace roger {
 			});
 		}
 
-		void read_shutdowned(WWRP<wawo::net::channel_handler_context> const& ctx) {
+		void read_closed(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
 			WAWO_ASSERT (fctx->ch_stream_ctx != NULL);
 			fctx->ch_stream_ctx->event_poller()->execute([fctx]() {
 				fctx->server_read_closed = true;
-				TRACE_SERVER_SIDE_CTX("[server][s%u]server read shutdown, flush_down", fctx->ch_stream_ctx->ch->ch_id());
+				TRACE_SERVER_SIDE_CTX("[server][s%u]server read close, flush_down", fctx->ch_stream_ctx->ch->ch_id());
 				flush_down(fctx, NULL);
 			});
 		}
@@ -360,7 +360,7 @@ namespace roger {
 			TRACE_SERVER_SIDE_CTX("[server][forward_ctx][s%u]stream_accepted", fctx->ch_stream_ctx->ch->ch_id() );
 		}
 
-		void read_shutdowned(WWRP<wawo::net::channel_handler_context> const& ctx) {
+		void read_closed(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WAWO_ASSERT(ctx != NULL);
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
