@@ -15,12 +15,12 @@ void _Test_VLD() {
 #include "dns_resolver.hpp"
 
 int main(int argc, char** argv) {
-
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
 	_Test_VLD();
 #endif
-
 	wawo::app App;
+	//WWRP<wawo::net::socket> so = wawo::make_ref<wawo::net::socket>(wawo::net::AIF_F_INET, wawo::net::T_STREAM, wawo::net::P_TCP);
+
 
 	std::vector<std::string> ns;
 #if WAWO_ISWIN

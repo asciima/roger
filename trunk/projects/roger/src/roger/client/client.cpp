@@ -31,6 +31,7 @@
 
 	wawo::app _app;
 
+	
 	std::string ip(argv[1]);
 	wawo::u16_t port = wawo::to_u32(argv[2]) & 0xFFFF;
 	std::string proto = std::string(argv[3]);
@@ -49,6 +50,7 @@
 		ch->pipeline()->add_last(wawo::make_ref<roger::local_proxy_handler>());
 	}, roger::client_cfg );
 	WAWO_ASSERT(listen_f->get() == wawo::OK);
+	
 
 	std::string http_listenurl = "tcp://0.0.0.0:8088";
 	WWRP<wawo::net::channel_future> http_listen_f = wawo::net::socket::listen_on(http_listenurl, [](WWRP<wawo::net::channel> const& ch) {

@@ -12,7 +12,7 @@ ifdef build
 	PRJ_BUILD := $(build)
 endif
 
-ifeq ($(PRJ_ARCH),arm32)
+ifeq ($(PRJ_ARCH),armv7ahf)
 	CXX := armv7-rpi2-linux-gnueabihf-g++
 	CC := armv7-rpi2-linux-gnueabihf-gcc
 	AR := armv7-rpi2-linux-gnueabihf-ar
