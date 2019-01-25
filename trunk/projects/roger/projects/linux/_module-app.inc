@@ -46,9 +46,9 @@ APP_ALL_O_FILES_CLIENT	:= $(addprefix $(CLIENT_BIN_OBJECTS_PATH)/,$(APP_ALL_O_FI
 #custome for codeblock
 #CC_MISC := $(CC_MISC) -finput-charset=GBK -fexec-charset=GBK
 
-ifeq ($(PRJ_BUILD),debug)
-	CC_MISC := $(CC_MISC) -rdynamic
-endif
+#ifeq ($(PRJ_BUILD),debug)
+	LINK_MISC := $(LINK_MISC) -rdynamic
+#endif
 
 roger_server: udns wawo $(SERVER_TARGET)
 roger_client: wawo $(CLIENT_TARGET)
