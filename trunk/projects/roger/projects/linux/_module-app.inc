@@ -47,7 +47,7 @@ APP_ALL_O_FILES_CLIENT	:= $(addprefix $(CLIENT_BIN_OBJECTS_PATH)/,$(APP_ALL_O_FI
 #CC_MISC := $(CC_MISC) -finput-charset=GBK -fexec-charset=GBK
 
 #ifeq ($(PRJ_BUILD),debug)
-	LINK_MISC := $(LINK_MISC) -rdynamic
+LINK_MISC := $(LINK_MISC) -rdynamic
 #endif
 
 roger_server: udns wawo $(SERVER_TARGET)
@@ -60,7 +60,7 @@ $(SERVER_TARGET): $(APP_ALL_O_FILES_SERVER)
 	
 	@echo "---"
 	@echo \*\* assembling $(SERVER_TARGET)...
-	@echo $(CXX) $^ -o $@ $(LINK_LIBS)
+	@echo $(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS)
 	@$(CXX) $(LINK_MISC) $^ -o $@ $(LINK_LIBS) 
 	@echo "---"
 	
