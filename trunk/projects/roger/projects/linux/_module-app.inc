@@ -112,3 +112,6 @@ roger_server_run:
 roger_client_clean: wawo_clean
 	rm -rf $(CLIENT_BIN_OBJECTS_PATH)/*
 	rm -rf $(CLIENT_TARGET)
+	
+roger_clean: roger_server_clean roger_client_clean
+roger_all: roger_client roger_server
