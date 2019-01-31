@@ -19,8 +19,6 @@ int main(int argc, char** argv) {
 	_Test_VLD();
 #endif
 	wawo::app App;
-	//WWRP<wawo::net::socket> so = wawo::make_ref<wawo::net::socket>(wawo::net::AIF_F_INET, wawo::net::T_STREAM, wawo::net::P_TCP);
-
 
 	std::vector<std::string> ns;
 #if WAWO_ISWIN

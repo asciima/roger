@@ -499,7 +499,10 @@ namespace roger {
 
 		void dial_one_mux() {
 
-			if (m_exit.load() == false) { return; }
+			if (m_exit.load() == false) {
+				WAWO_WARN("[mux_pool]exit checked, cancel dial");
+				return; 
+			}
 
 			WWRP<wawo::net::channel_future> dial_f = wawo::net::socket::dial(m_mux_dialurl, [](WWRP<wawo::net::channel> const& ch) {
 				WWRP<wawo::net::channel_handler_abstract> h_hlen = wawo::make_ref<wawo::net::handler::hlen>();
@@ -521,6 +524,7 @@ namespace roger {
 					WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(2), [](WWRP<timer> const& t) {
 						mux_pool::instance()->dial_one_mux();
 					});
+					WAWO_WARN("[mux_pool]mux dial failed with: %d, schedule another dial", f->get());
 					wawo::global_timer_manager::instance()->start(t_dial);
 				}
 			});
@@ -530,12 +534,14 @@ namespace roger {
 		{
 			wawo::lock_guard<wawo::spin_mutex> lg(m_mutex);
 			m_muxs.push_back(mux_);
+			WAWO_INFO("[mux_pool]mux dial done, add to pool");
 		}
 
 		void error(WWRP < wawo::net::handler::mux> const& mux_) {
 			WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(2), [](WWRP<timer> const& t) {
 				mux_pool::instance()->dial_one_mux();
 			});
+			WAWO_ERR("[mux_pool]mux dial with error, schedule another dial");
 			wawo::global_timer_manager::instance()->start(t_dial);
 		}
 
@@ -550,6 +556,7 @@ namespace roger {
 				}
 				++it;
 			}
+			WAWO_WARN("[mux_pool]mux closed, schedule another dial");
 			WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(2), [](WWRP<timer> const& t) {
 				mux_pool::instance()->dial_one_mux();
 			});
