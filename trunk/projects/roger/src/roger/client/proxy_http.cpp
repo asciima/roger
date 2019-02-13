@@ -143,15 +143,14 @@ namespace roger {
 
 			int parsert = wawo::net::http::parse_url(ppctx->cur_req->url, ppctx->cur_req->urlfields, p->opt == O_CONNECT);
 			if (parsert != wawo::OK) {
-				WAWO_ERR("[roger][#%u]req url parsed failed: %s", ppctx->ch_client_ctx->ch->ch_id(), ppctx->cur_req->url.c_str() );
+				WAWO_ERR("[roger][http][#%u]req url parsed failed: %s", ppctx->ch_client_ctx->ch->ch_id(), ppctx->cur_req->url.c_str() );
 				return parsert;
 			}
 
-			//@TODO
 			//check url:https://tools.ietf.org/html/rfc2616#page-128 to process a empty host string
 			if(ppctx->cur_req->urlfields.host.length() == 0 ) {
 				//we'll check host header later
-				WAWO_WARN("opt: %s, data: %s", option_name_str[ppctx->cur_req->opt], data);
+				WAWO_WARN("[roger][http]opt: %s, data: %s", option_name_str[ppctx->cur_req->opt], data);
 			}
 
 			//WAWO_ASSERT(pctx->cur_req->urlfields.host.length() > 0);
@@ -210,7 +209,7 @@ namespace roger {
 			}
 
 			if (host.length() == 0 || host.length() >= 512) {
-				WAWO_ERR("[roger][#%u]invalid http request: %s", ppctx->ch_client_ctx->ch->ch_id(), host.c_str());
+				WAWO_ERR("[roger][http][#%u]invalid http request: %s", ppctx->ch_client_ctx->ch->ch_id(), host.c_str());
 				return WAWO_NEGATIVE(HPE_INVALID_URL);
 			}
 
@@ -225,7 +224,7 @@ namespace roger {
 				wawo::net::dotiptoip(host.c_str(), ipv4);
 				address_type = IPV4;
 				if (ipv4 == 0) {
-					WAWO_ERR("[roger][#%u]invalid host: %s", ppctx->ch_client_ctx->ch->ch_id(), host.c_str());
+					WAWO_ERR("[roger][http][#%u]invalid host: %s", ppctx->ch_client_ctx->ch->ch_id(), host.c_str());
 					return WAWO_NEGATIVE(HPE_INVALID_URL);
 				}
 			}
@@ -256,7 +255,7 @@ namespace roger {
 				WAWO_ASSERT(ppctx->stream_read_closed == false);
 				WWRP<wawo::net::handler::mux> mux_ = mux_pool::instance()->next();
 				if (mux_ == NULL) {
-					WAWO_ERR("[client][#%u]no mux connected", ppctx->ch_client_ctx->ch->ch_id());
+					WAWO_ERR("[roger][http][#%u]no mux connected", ppctx->ch_client_ctx->ch->ch_id());
 					ppctx->state = PIPE_DIAL_STREAM_FAILED;
 					WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>();
 					resp_connect_result_to_client(ppctx, downp, CANCEL_CODE_PROXY_NOT_AVAILABLE);
@@ -302,7 +301,7 @@ namespace roger {
 				_pctx->stream_id = sid;
 				WWRP<wawo::net::channel_promise> dial_f = muxs->make_promise();
 
-				TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]insert into ppctx", ppctx->ch_client_ctx->ch->ch_id(), _pctx->stream_id, ppctx->HP_key.c_str());
+				TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]insert into ppctx", ppctx->ch_client_ctx->ch->ch_id(), _pctx->stream_id, ppctx->HP_key.c_str());
 
 				dial_f->add_listener([_HP_key,sid,_pctx, ppctx](WWRP<wawo::net::channel_future> const& f) {
 					int rt = f->get();
@@ -315,7 +314,7 @@ namespace roger {
 							_pctx->state = PIPE_DIAL_STREAM_OK;
 						} else { 
 							_pctx->state = PIPE_DIAL_STREAM_FAILED;
-							WAWO_INFO("[client][#%u]dial mux_stream failed:%d, domain: %s:%u", sid, rt, _pctx->dst_domain.c_str(), _pctx->dst_port);
+							WAWO_INFO("[roger][http][#%u]dial mux_stream failed:%d, domain: %s:%u", sid, rt, _pctx->dst_domain.c_str(), _pctx->dst_port);
 							WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>();
 							resp_connect_result_to_client(_pctx, downp, CANCEL_CODE_PROXY_NOT_AVAILABLE);
 							
@@ -578,7 +577,7 @@ namespace roger {
 					pctx->client_read_closed = true;
 					http_up(pctx, NULL);
 
-					TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]erase from ppctx, REACH: reqs.size() == 0 && connection: close", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
+					TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]erase from ppctx, REACH: reqs.size() == 0 && connection: close", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
 				}
 
 				TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]pop req: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), _m->url.c_str());

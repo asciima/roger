@@ -425,18 +425,18 @@ namespace roger {
 				case roger::E_DNS_BADQUERY:
 				case roger::E_DNS_PROTOCOL_ERROR:
 				{
-					downp->write_left((byte_t*)HTTP_RESP_CONNECT_HOST_FAILED, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
+					downp->write_left((byte_t*)HTTP_RESP_CONNECT_HOST_FAILED, wawo::strlen(HTTP_RESP_CONNECT_HOST_FAILED));
 				}
 				break;
 				case roger::E_DNS_DOMAIN_NO_DATA:
 				case roger::E_DNS_DOMAIN_NAME_NOT_EXISTS:
 				{
-					downp->write_left((byte_t*)HTTP_RESP_BAD_REQUEST, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
+					downp->write_left((byte_t*)HTTP_RESP_BAD_REQUEST, wawo::strlen(HTTP_RESP_BAD_REQUEST));
 				}
 				break;
 				default:
 				{
-					downp->write_left((byte_t*)HTTP_RESP_CONNECT_HOST_FAILED, wawo::strlen(HTTP_RESP_RELAY_SUCCEED));
+					downp->write_left((byte_t*)HTTP_RESP_CONNECT_HOST_FAILED, wawo::strlen(HTTP_RESP_CONNECT_HOST_FAILED));
 				}
 				break;
 			}
@@ -1108,8 +1108,13 @@ namespace roger {
 					}
 				}//end for __HTTP_PARSE tag
 				if (ppctx->type == T_HTTPS) {
-					WAWO_ASSERT(income->len() == 0);
-					WAWO_ASSERT(ppctx->state == PIPE_PREPARE);
+					WAWO_ASSERT(ppctx->state == PIPE_PREPARE, "[roger][https]ppctx->state: %d, ppctx->cur_req: %llu", ppctx->state, ppctx->cur_req.get() );
+
+					if (income->len()) {
+						ppctx->protocol_packet->write(income->begin(), income->len());
+						WAWO_WARN("[roger][https]income->len() == %d after protocol check" , income->len() );
+						income->reset();
+					}
 					goto _begin_check;
 				}
 			}//end for HTTP_PARSER state
