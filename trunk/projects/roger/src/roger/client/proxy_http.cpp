@@ -208,7 +208,7 @@ namespace roger {
 				}
 			}
 
-			if (host.length() == 0 || host.length() >= 512) {
+			if (host.length() == 0 || host.length() >=HOST_URL_MAX_LENGTH) {
 				WAWO_ERR("[roger][http][#%u]invalid http request: %s", ppctx->ch_client_ctx->ch->ch_id(), host.c_str());
 				return WAWO_NEGATIVE(HPE_INVALID_URL);
 			}

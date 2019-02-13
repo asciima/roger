@@ -48,6 +48,8 @@
 	#define TRACE_DNS(...)
 #endif
 
+#define HOST_MAX_LENGTH 1024
+#define HOST_URL_MAX_LENGTH 4096
 
 namespace roger {
 

@@ -90,12 +90,12 @@ namespace roger {
 		}
 		else if (at == ADDR_DOMAIN) {
 			u8_t dlen = pctx->protocol_packet->read<u8_t>();
-			if (dlen >= 512) {
+			if (dlen >= HOST_MAX_LENGTH) {
 				WAWO_ERR("[client][#%u]invalid domain", pctx->ch_client_ctx->ch->ch_id());
 				return E_SOCKS5_INVALID_DOMAIN;
 			}
 
-			char domain[512] = { 0 };
+			char domain[HOST_MAX_LENGTH] = { 0 };
 			u32_t drlen = pctx->protocol_packet->read((wawo::byte_t*)domain, dlen);
 			WAWO_ASSERT(dlen == drlen);
 			pctx->address_type = HOST;
@@ -136,8 +136,8 @@ namespace roger {
 	int _socks4_parse(WWRP<proxy_ctx> const& pctx) {
 		WAWO_ASSERT(pctx->type == T_SOCKS4);
 
-		byte_t _tmp[512] = { 0 };
-		u32_t count = pctx->protocol_packet->peek(_tmp, 512);
+		byte_t _tmp[HOST_MAX_LENGTH] = { 0 };
+		u32_t count = pctx->protocol_packet->peek(_tmp, HOST_MAX_LENGTH);
 
 		enum parse_socks4_connect_state {
 			S4_CHECK_VN,
