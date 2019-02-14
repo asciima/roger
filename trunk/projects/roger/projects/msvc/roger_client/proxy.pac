@@ -12222,8 +12222,8 @@ var domains = {
   "zyzc9.com": 1
 };
 
-var proxy = "PROXY_TYPE ROGER_HTTP_SERVER_ADDR:12122; DIRECT;";
-var direct = 'DIRECT;';
+var proxy = "PROXY_TYPE ROGER_HTTP_SERVER_ADDR:12122; DIRECT";
+var direct = 'DIRECT';
 
 var hasOwnProperty = Object.hasOwnProperty;
 

@@ -48,6 +48,7 @@
 	#define TRACE_DNS(...)
 #endif
 
+#define DOMAIN_MAX_LENGTH 255
 #define HOST_MAX_LENGTH 1024
 #define HOST_URL_MAX_LENGTH 4096
 

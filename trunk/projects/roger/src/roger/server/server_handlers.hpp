@@ -228,13 +228,19 @@ namespace roger {
 		WWRP<wawo::net::channel_future> dial_f = wawo::net::socket::dial(dialurl, [fctx](WWRP<wawo::net::channel> const& ch) {
 			WWRP<server_handler> h = wawo::make_ref<server_handler>();
 			ch->pipeline()->add_last(h);
+			
+			ch->set_ctx(fctx);
 		}, roger::server_cfg );
 
 		dial_f->add_listener([fctx](WWRP<wawo::net::channel_future> const& f) {
 			int rt = f->get();
 			if (rt == wawo::OK) {
-				TRACE_SERVER_SIDE_CTX("[server][forward_ctx][s%u--%s:%u][#%d]dial ok", fctx->ch_stream_ctx->ch->ch_id(), wawo::net::ipv4todotip(fctx->dst_ipv4).c_str(), fctx->dst_port, f->channel()->ch_id() );
-				f->channel()->set_ctx(fctx);
+				WAWO_ASSERT(f->channel() != NULL);
+				TRACE_SERVER_SIDE_CTX("[server][forward_ctx][s%u--%s:%u][#%d]dial ok", fctx->ch_stream_ctx->ch->ch_id(), wawo::net::ipv4todotip(fctx->dst_ipv4).c_str(), fctx->dst_port, f->channel()->ch_id());
+				//f->channel()->set_ctx(fctx);
+				WAWO_ASSERT(fctx == f->channel()->get_ctx<forward_ctx>());
+			} else {
+				WAWO_ASSERT(f->channel() == NULL);
 			}
 
 			fctx->ch_stream_ctx->event_poller()->execute([fctx,rt]() {
@@ -437,8 +443,8 @@ namespace roger {
 						return;
 					}
 
-					if ( dlen[0] >= 255 ) {
-						WAWO_ERR("[server][s%u]domain len exceed 512 bytes, close stream, domain name: %s", ctx->ch->ch_id(), dlen[0] );
+					if ( dlen[0] >= DOMAIN_MAX_LENGTH) {
+						WAWO_ERR("[server][s%u]domain len exceed %d bytes, close stream, domain name: %s", ctx->ch->ch_id(), DOMAIN_MAX_LENGTH,  dlen[0] );
 						fctx->server_read_closed = true;
 						WWRP<wawo::packet> outp = wawo::make_ref<wawo::packet>();
 						outp->write<int32_t>(roger::E_INVALID_DOMAIN);
