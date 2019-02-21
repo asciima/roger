@@ -1108,6 +1108,10 @@ namespace roger {
 					}
 				}//end for __HTTP_PARSE tag
 				if (ppctx->type == T_HTTPS) {
+					if(ppctx->state == HTTP_REQ_PARSE) {
+						WAWO_ASSERT(income->len() == 0);
+						return;
+					}
 					WAWO_ASSERT(ppctx->state == PIPE_PREPARE, "[roger][https]ppctx->state: %d, ppctx->cur_req: %llu", ppctx->state, ppctx->cur_req.get() );
 
 					if (income->len()) {
