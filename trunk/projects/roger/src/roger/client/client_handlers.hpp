@@ -327,8 +327,11 @@ namespace roger {
 		case PIPE_DIAL_SERVER_FAILED:
 		{
 			WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
-			WAWO_ASSERT(up == NULL);
-			ctx_up(ctx, up);
+			//in case of dial failure, we close client
+			//WAWO_ASSERT(up == NULL);
+			//ctx_up(ctx, up);
+			WAWO_ASSERT(ctx->ch_client_ctx != NULL);
+			ctx->ch_client_ctx->close();
 		}
 		break;
 		default:
@@ -1107,12 +1110,8 @@ namespace roger {
 						goto _end_check;
 					}
 				}//end for __HTTP_PARSE tag
-				if (ppctx->type == T_HTTPS) {
-					if(ppctx->state == HTTP_REQ_PARSE) {
-						WAWO_ASSERT(income->len() == 0);
-						return;
-					}
-					WAWO_ASSERT(ppctx->state == PIPE_PREPARE, "[roger][https]ppctx->state: %d, ppctx->cur_req: %llu", ppctx->state, ppctx->cur_req.get() );
+				if (ppctx->type == T_HTTPS && ppctx->state == PIPE_PREPARE ) {
+//					WAWO_ASSERT(ppctx->state == PIPE_PREPARE, "[roger][https]ppctx->state: %d, ppctx->cur_req: %llu", ppctx->state, ppctx->cur_req.get() );
 
 					if (income->len()) {
 						ppctx->protocol_packet->write(income->begin(), income->len());
@@ -1125,12 +1124,16 @@ namespace roger {
 			break;
 			case PIPE_DIAL_STREAM_FAILED:
 			{
-				WAWO_ASSERT(!"PROTOCOL CHECK LOGIC ISSUE");
+				WAWO_ASSERT(ppctx->ch_client_ctx != NULL);
+				ppctx->ch_client_ctx->close();
 			}
 			break;
 			case PIPE_DIAL_SERVER_FAILED:
 			{
 				WAWO_ASSERT(ppctx->type != T_HTTP);
+				WAWO_ASSERT(ppctx->ch_client_ctx != NULL);
+				ppctx->ch_client_ctx->close();
+
 				//ignore this input
 
 				//close flow in this case
@@ -1142,7 +1145,9 @@ namespace roger {
 			break;
 			case HTTP_PARSE_ERROR:
 			{
-				WAWO_ASSERT(!"HTTP PARSE LOGIC ISSUE");
+				WAWO_ASSERT(ppctx->ch_client_ctx != NULL);
+				ppctx->ch_client_ctx->close();
+				//WAWO_ASSERT(!"HTTP PARSE LOGIC ISSUE");
 			}
 			break;
 			default:
