@@ -161,13 +161,12 @@ namespace roger {
 		}
 
 		WWRP<async_dns_query> async_resolve( std::string const& domain, WWRP<ref_base> const& cookie, fn_resolve_succes const& success, fn_resolve_error const& error) {
-			WWRP<async_dns_query> query = wawo::make_ref<async_dns_query>();
 			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			if(m_dns_ctx == NULL) {
-				error(roger::E_DNS_SERVER_SHUTDOWN, cookie );
-				return query;
+				return NULL;
 			}
 
+			WWRP<async_dns_query> query = wawo::make_ref<async_dns_query>();
 			async_resolve_cookie* _cookie = new async_resolve_cookie();
 			WAWO_ALLOC_CHECK(_cookie, sizeof(async_resolve_cookie));
 			_cookie->user_cookie = cookie;

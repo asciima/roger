@@ -462,7 +462,13 @@ namespace roger {
 					fctx->ts_dns_lookup_start = wawo::time::curr_microseconds();
 					fctx->dns_try_time = 1;
 					fctx->query = dns_resolver::instance()->async_resolve(fctx->dst_domain, fctx, &dns_resolve_success, &dns_resolve_error);
-					WAWO_ASSERT(fctx->query != NULL);
+					if(fctx->query == NULL) {
+						WAWO_ERR("[server][s%u]domain service shutdown, domain name: %s", ctx->ch->ch_id(), DOMAIN_MAX_LENGTH, dlen[0]);
+						fctx->server_read_closed = true;
+						WWRP<wawo::packet> outp = wawo::make_ref<wawo::packet>();
+						outp->write<int32_t>(roger::E_DNS_SERVER_SHUTDOWN);
+						flush_down(fctx, outp);
+					}
 					return;
 				}
 				break;
