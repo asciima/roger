@@ -45,7 +45,7 @@ namespace roger {
 
 		~dns_resolver() {}
 
-		int init(std::vector<std::string> const& name_servers) {
+		int start(std::vector<std::string> const& name_servers) {
 			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			m_ns = std::vector<std::string>(name_servers.begin(), name_servers.end());
 			m_dns_ctx = &dns_defctx;
@@ -83,17 +83,23 @@ namespace roger {
 			m_timer = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(200), &dns_resolver::cb_dns_timeout, this);
 			so->init();
 			//libudns do not support iocp
-			so->async_io_init();
-			so->ch_async_io_begin_read( std::bind(&dns_resolver::async_read_dns_reply, this, std::placeholders::_1));
+			so->async_io_init([so](wawo::net::async_io_result const& r) {
+			});
+			so->ch_async_io_begin_read(std::bind(&dns_resolver::async_read_dns_reply, dns_resolver::instance(), std::placeholders::_1));
 			m_so = so;
 			return wawo::OK;
 		}
 
-		void deinit() {
+		void _cb_init_done() {
+			
+		}
+
+		void stop() {
 			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			m_so->ch_close();
 			dns_close(m_dns_ctx);
 			m_dns_ctx = NULL;
+			m_so = NULL;
 		}
 
 		void cb_dns_timeout( WWRP<wawo::timer> const& t) {
@@ -107,7 +113,7 @@ namespace roger {
 				m_has_timer = false;
 				return;
 			}
-			m_so->event_poller()->start_timer(t);
+			m_so->event_poller()->launch(t);
 		}
 
 		void async_read_dns_reply(async_io_result const& r) {
@@ -155,19 +161,24 @@ namespace roger {
 		}
 
 		WWRP<async_dns_query> async_resolve( std::string const& domain, WWRP<ref_base> const& cookie, fn_resolve_succes const& success, fn_resolve_error const& error) {
+			WWRP<async_dns_query> query = wawo::make_ref<async_dns_query>();
+			lock_guard<spin_mutex> lg_ctx(m_mutex);
+			if(m_dns_ctx == NULL) {
+				error(roger::E_DNS_SERVER_SHUTDOWN, cookie );
+				return query;
+			}
+
 			async_resolve_cookie* _cookie = new async_resolve_cookie();
-			WAWO_ALLOC_CHECK(_cookie, sizeof(async_resolve_cookie) );
+			WAWO_ALLOC_CHECK(_cookie, sizeof(async_resolve_cookie));
 			_cookie->user_cookie = cookie;
 			_cookie->success = success;
 			_cookie->error = error;
 
-			WWRP<async_dns_query> query = wawo::make_ref<async_dns_query>();
-			lock_guard<spin_mutex> lg_ctx(m_mutex);
 			query->dnsquery = dns_submit_a4(m_dns_ctx, domain.c_str(), 0, dns_resolver::dns_query_v4_cb, (void*)_cookie);
 			dns_timeouts(m_dns_ctx, -1, 0);
 			if (!m_has_timer) {
 				m_has_timer = true;
-				m_so->event_poller()->start_timer(m_timer);
+				m_so->event_poller()->launch(m_timer);
 			}
 			TRACE_DNS("[dns_resolve]async resolve: %s", domain.c_str() );
 			return query;

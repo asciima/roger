@@ -528,7 +528,7 @@ namespace roger {
 						mux_pool::instance()->dial_one_mux();
 					});
 					WAWO_WARN("[mux_pool]mux dial failed with: %d, schedule another dial", f->get());
-					wawo::global_timer_manager::instance()->start(t_dial);
+					io_event_loop_group::instance()->launch(t_dial);
 				}
 			});
 		}
@@ -545,7 +545,7 @@ namespace roger {
 				mux_pool::instance()->dial_one_mux();
 			});
 			WAWO_ERR("[mux_pool]mux dial with error, schedule another dial");
-			wawo::global_timer_manager::instance()->start(t_dial);
+			io_event_loop_group::instance()->launch(t_dial);
 		}
 
 		void closed(WWRP<wawo::net::handler::mux> const& mux_)
@@ -563,7 +563,7 @@ namespace roger {
 			WWRP<timer> t_dial = wawo::make_ref<timer>(std::chrono::seconds(2), [](WWRP<timer> const& t) {
 				mux_pool::instance()->dial_one_mux();
 			});
-			wawo::global_timer_manager::instance()->start(t_dial);
+			io_event_loop_group::instance()->launch(t_dial);
 		}
 
 		WWRP<wawo::net::handler::mux> next() {
@@ -901,20 +901,20 @@ namespace roger {
 									return;
 								}
 								if (ppctx->http_proxy_ctx_map.size() != 0) {
-									ppctx->ch_client_ctx->event_poller()->start_timer(t);
+									ppctx->ch_client_ctx->event_poller()->launch(t);
 									return;
 								}
 								const roger_http_timepoint_t now = std::chrono::time_point_cast<roger_http_dur_t>(roger_http_clock_t::now());
 								const roger_http_dur_t diff = now - ppctx->http_tp_last_req;
 								if (diff.count() < 30) {
-									ppctx->ch_client_ctx->event_poller()->start_timer(t);
+									ppctx->ch_client_ctx->event_poller()->launch(t);
 									return;
 								}
 
 								ppctx->stream_read_closed = true;
 								http_down(ppctx, NULL);
 							});
-							ppctx->ch_client_ctx->event_poller()->start_timer(_http_timer);
+							ppctx->ch_client_ctx->event_poller()->launch(_http_timer);
 						}
 					}
 				}

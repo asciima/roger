@@ -237,6 +237,7 @@ namespace roger {
 		E_DNS_DOMAIN_NO_DATA = -40008,
 		E_DNS_NOMEM = -40009,
 		E_DNS_BADQUERY = -40010,
+		E_DNS_SERVER_SHUTDOWN = -40011
 	};
 
 	const static int dns_error_map[] = {

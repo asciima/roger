@@ -280,7 +280,7 @@ namespace roger {
 		WAWO_ASSERT(cookie_ != NULL);
 		WWRP<forward_ctx> fctx = wawo::static_pointer_cast<forward_ctx>(cookie_);
 		fctx->ts_dns_lookup_done = wawo::time::curr_microseconds();
-		WAWO_ASSERT(code <= E_DNSLOOKUP_RETURN_NO_IP && code>= E_DNS_BADQUERY );
+		WAWO_ASSERT(code <= E_DNSLOOKUP_RETURN_NO_IP && code>= E_DNS_SERVER_SHUTDOWN);
 
 		if (code == E_DNS_TEMPORARY_ERROR && (fctx->dns_try_time) < 5) {
 			WWRP<wawo::timer> retry_timer = wawo::make_ref<wawo::timer>( std::chrono::milliseconds((fctx->dns_try_time)<<1),
@@ -291,7 +291,7 @@ namespace roger {
 					++fctx->dns_try_time;
 					(void)t;
 				});
-			fctx->ch_stream_ctx->event_poller()->start_timer(retry_timer);
+			fctx->ch_stream_ctx->event_poller()->launch(retry_timer);
 			return;
 		}
 
