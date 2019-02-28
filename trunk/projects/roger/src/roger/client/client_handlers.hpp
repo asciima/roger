@@ -195,7 +195,7 @@ namespace roger {
 		}
 		else {
 			if (ctx->stream_read_closed) {
-				TRACE_CLIENT_SIDE_CTX("[client][#%u]stream read closed, close client write", ctx->ch_client_ctx->ch->ch_id() );
+				TRACE_CLIENT_SIDE_CTX("[client][#%u]stream(down) read closed already, close client write", ctx->ch_client_ctx->ch->ch_id() );
 				ctx->ch_client_ctx->close_write();
 			}
 		}
@@ -1019,12 +1019,15 @@ namespace roger {
 
 				int ec;
 				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid,ec);
+				WAWO_DEBUG("[client][#%u]dial mux_stream begin:%d, target addr: %s:%u"
+					, sid, ec, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
+
 				if (ec != wawo::OK) {
 					ppctx->state = PIPE_DIAL_STREAM_FAILED;
 					WWRP<packet> downp = wawo::make_ref<packet>(64);
 					resp_connect_result_to_client(ppctx, downp, ec);
 					ppctx->ch_client_ctx->close();
-					WAWO_INFO("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
+					WAWO_WARN("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
 						, sid, ec, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
 					return;
 				}
@@ -1040,18 +1043,22 @@ namespace roger {
 					ppctx->ch_client_ctx->event_poller()->execute([ppctx,sid,rt,f]() {
 						if (rt == wawo::OK) {
 							ppctx->state = PIPE_DIAL_STREAM_OK;
+							WAWO_DEBUG("[client][#%u]dial mux_stream done, ok, target addr: %s:%u"
+								, sid, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
 						} else {
 							ppctx->state = PIPE_DIAL_STREAM_FAILED;
 							WWRP<packet> downp = wawo::make_ref<packet>(64);
 							resp_connect_result_to_client(ppctx, downp, rt);
 							ppctx->ch_client_ctx->close();
-							WAWO_INFO("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
+							WAWO_WARN("[client][#%u]dial mux_stream done failed:%d, target addr: %s:%u"
 								, sid, rt, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
 						}
 					});
 				});
 
 				muxs->dial([](WWRP<wawo::net::channel> const& ch) {
+					WAWO_DEBUG("[client][#%u]dial mux_stream done init pipeline", ch->ch_id() );
+
 					ch->ch_set_read_buffer_size(roger::mux_stream_sbc.rcv_size);
 					ch->ch_set_write_buffer_size(roger::mux_stream_sbc.snd_size);
 					WWRP<mux_stream_handler> h = wawo::make_ref<mux_stream_handler>();

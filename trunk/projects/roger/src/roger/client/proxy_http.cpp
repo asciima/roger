@@ -309,12 +309,14 @@ namespace roger {
 						WAWO_ASSERT(f->channel()->ch_id() == _pctx->stream_id);
 						f->channel()->set_ctx(_pctx);
 					}
+
 					_pctx->ch_client_ctx->ch->event_poller()->execute([_HP_key,sid,rt,_pctx, ppctx]() {
 						if (rt == wawo::OK) {
 							_pctx->state = PIPE_DIAL_STREAM_OK;
+							WAWO_DEBUG("[roger][http][#%u]dial mux_stream done, ok:%d, domain: %s:%u", sid, rt, _pctx->dst_domain.c_str(), _pctx->dst_port);
 						} else { 
 							_pctx->state = PIPE_DIAL_STREAM_FAILED;
-							WAWO_INFO("[roger][http][#%u]dial mux_stream failed:%d, domain: %s:%u", sid, rt, _pctx->dst_domain.c_str(), _pctx->dst_port);
+							WAWO_WARN("[roger][http][#%u]dial mux_stream done, failed:%d, domain: %s:%u", sid, rt, _pctx->dst_domain.c_str(), _pctx->dst_port);
 							WWRP<wawo::packet> downp = wawo::make_ref<wawo::packet>();
 							resp_connect_result_to_client(_pctx, downp, CANCEL_CODE_PROXY_NOT_AVAILABLE);
 							
