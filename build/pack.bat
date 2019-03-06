@@ -2,7 +2,7 @@
 
 for /f "tokens=1,2,3,4,5,6* delims=," %%i in ('.\date.exe +"%%Y,%%m,%%d,%%H,%%M,%%S"') do set yy=%%i& set mo=%%j& set dd=%%k& set hh=%%l& set mm=%%m& set ss=%%n
 
-set YMDHM=%yy%-%mo%-%dd%_%hh%_%mm%
+set YMDHM=%yy%%mo%%dd%%hh%%mm%
 
 if not exist %YMDHM% (
 	echo '%YMDHM% not exists, do md %YMDHM%'

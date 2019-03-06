@@ -122,7 +122,9 @@ namespace roger {
 				dns_ioevent(m_dns_ctx, 0);
 			} else {
 				WAWO_ERR("[dns_resolver]dns read error: %d", r.v.code );
-				m_so->ch_close();
+				if(m_so != NULL) {
+					m_so->ch_close();
+				}
 			}
 		}
 

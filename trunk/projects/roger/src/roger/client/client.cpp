@@ -17,7 +17,11 @@
 #include "../shared/shared.hpp"
 #include "client_handlers.hpp"
 
-	int main(int argc, char** argv) {
+//void foo() {}
+//typedef std::function<void(int)> fn_void_int_t;
+//fn_void_int_t __fn = std::bind(foo);
+
+int main(int argc, char** argv) {
 
 #if defined(WIN32) && defined(VLD_DEBUG_ON) && VLD_DEBUG_ON
 		_Test_VLD();
