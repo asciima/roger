@@ -328,7 +328,7 @@ namespace roger {
 				muxs->dial([](WWRP<wawo::net::channel> const& ch) {
 					ch->ch_set_read_buffer_size(roger::mux_stream_sbc.rcv_size);
 					ch->ch_set_write_buffer_size(roger::mux_stream_sbc.snd_size);
-					WWRP<mux_stream_handler> h = wawo::make_ref<mux_stream_handler>();
+					WWRP<client_stream_handler> h = wawo::make_ref<client_stream_handler>();
 					ch->pipeline()->add_last(h);
 				}, dial_f);
 			}
