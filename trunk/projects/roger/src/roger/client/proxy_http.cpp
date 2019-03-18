@@ -6,7 +6,7 @@
 
 namespace roger {
 
-	static const char* option_name_str[wawo::net::http::O_MAX] = {
+	static const char* option_name_str[(int)wawo::net::http::option::O_MAX] = {
 		"GET",
 		"HEAD",
 		"POST",
@@ -98,9 +98,9 @@ namespace roger {
 		byte_t upper[WAWO_HTTP_METHOD_NAME_MAX_LEN];
 		wawo::strtoupper((char*)upper, WAWO_HTTP_METHOD_NAME_MAX_LEN, (char*)method);
 
-		for (u8_t i = 0; i < wawo::net::http::O_MAX; ++i) {
+		for (u8_t i = 0; i < (int)wawo::net::http::option::O_MAX; ++i) {
 			if (wawo::strpos((char*)upper, option_name_str[i]) != -1) {
-				if (i == wawo::net::http::O_CONNECT) {
+				if (i == (int)wawo::net::http::option::O_CONNECT) {
 					pctx->type = T_HTTPS;
 					return E_OK;
 				}
@@ -141,7 +141,7 @@ namespace roger {
 			ppctx->cur_req->opt = p->opt;
 			ppctx->cur_req->url = std::string(data, len);
 
-			int parsert = wawo::net::http::parse_url(ppctx->cur_req->url, ppctx->cur_req->urlfields, p->opt == O_CONNECT);
+			int parsert = wawo::net::http::parse_url(ppctx->cur_req->url, ppctx->cur_req->urlfields, p->opt == wawo::net::http::option::O_CONNECT);
 			if (parsert != wawo::OK) {
 				WAWO_ERR("[roger][http][#%u]req url parsed failed: %s", ppctx->ch_client_ctx->ch->ch_id(), ppctx->cur_req->url.c_str() );
 				return parsert;
@@ -235,7 +235,7 @@ namespace roger {
 				ppctx->dst_ipv4 = ipv4;
 				ppctx->dst_port = port;
 				//for https connection, one client one mux stream
-				WAWO_ASSERT(ppctx->cur_req->opt == wawo::net::http::O_CONNECT);
+				WAWO_ASSERT(ppctx->cur_req->opt == wawo::net::http::option::O_CONNECT);
 				return OK;
 			}
 
@@ -378,7 +378,7 @@ namespace roger {
 
 			if (ppctx->type == T_HTTPS) {
 				//directly return
-				WAWO_ASSERT(ppctx->cur_req->opt == wawo::net::http::O_CONNECT);
+				WAWO_ASSERT(ppctx->cur_req->opt == wawo::net::http::option::O_CONNECT);
 				WAWO_ASSERT(ppctx->state == HTTP_REQ_PARSE);
 				ppctx->state = PIPE_PREPARE;
 			} else {
@@ -584,6 +584,10 @@ namespace roger {
 
 				TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]pop req: %s", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str(), _m->url.c_str());
 				pctx->reqs.pop();
+
+				if (pctx->reqs.size() == 0) {
+					message_queue().swap(pctx->reqs);
+				}
 			}
 
 			if (pctx->resp_header_connection_close == true) {

@@ -80,7 +80,7 @@ namespace roger {
 				return nonblocking;
 			}
 
-			m_timer = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(200), &dns_resolver::cb_dns_timeout, this);
+			m_timer = wawo::make_ref<wawo::timer>(std::chrono::milliseconds(200), &dns_resolver::cb_dns_timeout, this, std::placeholders::_1);
 			so->init();
 			//libudns do not support iocp
 			so->async_io_init([so](wawo::net::async_io_result const& r) {

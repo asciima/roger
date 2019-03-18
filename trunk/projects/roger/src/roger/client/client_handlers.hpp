@@ -124,6 +124,7 @@ namespace roger {
 					WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
 					ctx->ch_stream_ctx->write(outp, f);
 				} else {
+					packet_queue().swap(ctx->up_to_stream_packets);
 					if (ctx->client_read_closed == true) {
 						if (ctx->ch_stream_ctx != NULL) {
 							ctx->ch_stream_ctx->close_write();
@@ -194,6 +195,7 @@ namespace roger {
 			ctx->ch_client_ctx->write(outp, f);
 		}
 		else {
+			packet_queue().swap(ctx->down_to_client_packets);
 			if (ctx->stream_read_closed) {
 				TRACE_CLIENT_SIDE_CTX("[client][#%u]stream(down) read closed already, close client write", ctx->ch_client_ctx->ch->ch_id() );
 				ctx->ch_client_ctx->close_write();
@@ -320,6 +322,8 @@ namespace roger {
 				ctx_up(ctx, t);
 				ctx->pending_outp.pop();
 			}
+			WAWO_ASSERT(ctx->pending_outp.size() == 0);
+			std::queue<WWRP<wawo::packet>>().swap(ctx->pending_outp);
 			WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
 			ctx_up(ctx, up);
 		}

@@ -37,6 +37,7 @@ namespace roger {
 					fctx->ch_server_ctx->write(outp, f);
 				}
 				else {
+					packet_queue().swap(fctx->up_to_server_packets);
 					if (fctx->stream_read_closed) {
 						TRACE_SERVER_SIDE_CTX("[server][s%u]no up to server packets left and stream read closed, close server write", fctx->ch_stream_ctx->ch->ch_id());
 						fctx->ch_server_ctx->close_write();
@@ -98,6 +99,7 @@ namespace roger {
 			WWRP<packet> outp = fctx->down_to_stream_packets.front();
 			fctx->ch_stream_ctx->write(outp, f);
 		} else {
+			packet_queue().swap(fctx->down_to_stream_packets);
 			if (fctx->server_read_closed) {
 				TRACE_SERVER_SIDE_CTX("[server][s%u]no down packets left and server_read_closed, close stream write", fctx->ch_stream_ctx->ch->ch_id());
 				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
