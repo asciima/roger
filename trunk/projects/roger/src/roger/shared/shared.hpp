@@ -15,13 +15,13 @@
 
 #ifdef _DEBUG
 	//#define DEBUG_HTTP_PROXY
-	//#define ENABLE_TRACE_SERVER_SIDE_CTX
+	#define ENABLE_TRACE_SERVER_SIDE_CTX
 	//#define ENABLE_TRACE_CLIENT_SIDE_CTX
 #endif
 
 //#define ENABLE_TRACE_SERVER_SIDE_CTX
-#define ENABLE_TRACE_CLIENT_SIDE_CTX
-#define ENABLE_DEBUG_HTTP_PROXY
+//#define ENABLE_TRACE_CLIENT_SIDE_CTX
+//#define ENABLE_DEBUG_HTTP_PROXY
 //#define ENABLE_TRACE_DNS_RESOLVE
 
 #ifdef ENABLE_DEBUG_HTTP_PROXY
@@ -303,9 +303,11 @@ namespace roger {
 	struct async_dns_query;
 	class roger_client;
 
-	enum ctx_write_state {
-		WS_IDLE,
-		WS_WRITING,
+	enum class ctx_write_state {
+		S_IDLE,
+		S_WRITING,
+		S_BLOCK,
+		S_ERROR
 	};
 
 	struct forward_ctx :
@@ -320,7 +322,8 @@ namespace roger {
 
 		WWRP<wawo::net::channel_handler_context> ch_stream_ctx;
 		WWRP<wawo::net::channel_handler_context> ch_server_ctx;
-
+		bool ch_server_read_chocked;
+		bool ch_stream_read_chocked;
 		WWRP<wawo::packet> client_up_first_packet; //first req packet
 		packet_queue up_to_server_packets;
 		packet_queue down_to_stream_packets;

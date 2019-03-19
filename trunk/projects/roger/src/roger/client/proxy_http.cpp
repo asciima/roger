@@ -245,7 +245,7 @@ namespace roger {
 			ppctx->cur_req->H->remove("proxy-connection");
 
 			const std::string _HP_key = host + ":"+ std::to_string(port);
-			stream_http_proxy_ctx_map_t::iterator it = ppctx->http_proxy_ctx_map.find(_HP_key);
+			stream_http_proxy_ctx_map_t::iterator&& it = ppctx->http_proxy_ctx_map.find(_HP_key);
 
 			if (it != ppctx->http_proxy_ctx_map.end() ) {
 				WAWO_ASSERT(it->second->client_read_closed == false);
@@ -270,11 +270,14 @@ namespace roger {
 				_pctx->type = T_HTTP;
 				_pctx->state = PIPE_DIALING_STREAM;
 
-				_pctx->up_state = WS_IDLE;
-				_pctx->down_state = WS_IDLE;
+				_pctx->up_state = ctx_write_state::S_IDLE;
+				_pctx->down_state = ctx_write_state::S_IDLE;
 
 				_pctx->client_read_closed = false;
 				_pctx->stream_read_closed = false;
+
+				_pctx->ch_client_read_chocked =false;
+				_pctx->ch_stream_read_chocked = false;
 
 				_pctx->ch_client_ctx = ppctx->ch_client_ctx;
 
@@ -339,7 +342,7 @@ namespace roger {
 
 			WWRP<wawo::packet> H;
 			encode_http_request_header(ppctx->cur_req, H);
-			http_up(ppctx->cur_req_ctx, H);
+			ctx_up(ppctx->cur_req_ctx, H);
 
 			TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]push req, %s, header: \n%s", ppctx->ch_client_ctx->ch->ch_id(), ppctx->cur_req_ctx->stream_id, ppctx->cur_req_ctx->HP_key.c_str(), ppctx->cur_req->url.c_str(), std::string((char*)H->begin(),H->len()).c_str() );
 			return wawo::OK;
@@ -355,17 +358,17 @@ namespace roger {
 			WAWO_ASSERT(ppctx->cur_req != NULL);
 			WAWO_ASSERT(ppctx->cur_req_ctx != NULL);
 
-			WWRP<packet> downp = wawo::make_ref<wawo::packet>(len + 2); //64 for chunk
-			downp->write((byte_t*)data, len);
+			WWRP<packet> up = wawo::make_ref<wawo::packet>(len + 2); //64 for chunk
+			up->write((byte_t*)data, len);
 
 			if (ppctx->cur_req_in_chunk_body) {
 				char hex_string[16] = { 0 };
 				int i = int_to_hex_string(len, hex_string, 16);
-				downp->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
-				downp->write_left((byte_t*)hex_string, i);
-				downp->write((byte_t*)WAWO_HTTP_CRLF, 2);
+				up->write_left((byte_t*)WAWO_HTTP_CRLF, 2);
+				up->write_left((byte_t*)hex_string, i);
+				up->write((byte_t*)WAWO_HTTP_CRLF, 2);
 			}
-			http_up(ppctx->cur_req_ctx, downp);
+			ctx_up(ppctx->cur_req_ctx, up);
 			return wawo::OK;
 		}
 
@@ -388,7 +391,7 @@ namespace roger {
 					WWRP<packet> chunk_trailing = wawo::make_ref<packet>(64);
 					static const char* chunk_body_trailing = "0\r\n\r\n";
 					chunk_trailing->write((byte_t*)chunk_body_trailing, 5);
-					http_up(ppctx->cur_req_ctx, chunk_trailing);
+					ctx_up(ppctx->cur_req_ctx, chunk_trailing);
 				}
 			}
 			ppctx->cur_req_ctx = NULL;
@@ -577,7 +580,7 @@ namespace roger {
 					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
 					//fake a read close
 					pctx->client_read_closed = true;
-					http_up(pctx, NULL);
+					ctx_up(pctx, NULL);
 
 					TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]erase from ppctx, REACH: reqs.size() == 0 && connection: close", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
 				}

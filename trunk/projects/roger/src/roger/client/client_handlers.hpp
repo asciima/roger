@@ -36,6 +36,8 @@ namespace roger {
 
 		WWRP<wawo::net::channel_handler_context> ch_client_ctx;
 		WWRP<wawo::net::channel_handler_context> ch_stream_ctx;
+		bool ch_client_read_chocked;
+		bool ch_stream_read_chocked;
 
 		WWRP<wawo::packet> protocol_packet;
 
@@ -118,8 +120,8 @@ namespace roger {
 							ctx_up_done(ctx, rt);
 						});
 					});
-					WAWO_ASSERT(ctx->up_state == WS_IDLE);
-					ctx->up_state = WS_WRITING;
+					WAWO_ASSERT(ctx->up_state == ctx_write_state::S_IDLE);
+					ctx->up_state = ctx_write_state::S_WRITING;
 					WWRP<wawo::packet>& outp = ctx->up_to_stream_packets.front();
 					WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
 					ctx->ch_stream_ctx->write(outp, f);
@@ -128,6 +130,11 @@ namespace roger {
 					if (ctx->client_read_closed == true) {
 						if (ctx->ch_stream_ctx != NULL) {
 							ctx->ch_stream_ctx->close_write();
+						}
+					} else {
+						if (ctx->ch_client_read_chocked) {
+							ctx->ch_client_read_chocked=false;
+							ctx->ch_client_ctx->ch->ch_async_io_begin_read();
 						}
 					}
 				}
@@ -152,26 +159,27 @@ namespace roger {
 	inline void ctx_up_done(WWRP<proxy_ctx> const& ctx, int flushrt) {
 		WAWO_ASSERT(ctx->ch_client_ctx != NULL);
 		WAWO_ASSERT(ctx->ch_client_ctx->event_poller()->in_event_loop());
-		WAWO_ASSERT(ctx->up_state == ctx_write_state::WS_WRITING);
-		ctx->up_state = ctx_write_state::WS_IDLE;
+		WAWO_ASSERT(ctx->up_state == ctx_write_state::S_WRITING);
 		if (flushrt == wawo::OK) {
+			ctx->up_state = ctx_write_state::S_IDLE;
 			WAWO_ASSERT(ctx->up_to_stream_packets.size());
 			ctx->up_to_stream_packets.pop();
 			_do_ctx_up(ctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
-		}
-		else {
+			ctx->up_state = ctx_write_state::S_BLOCK;
+		} else {
+			ctx->up_state = ctx_write_state::S_ERROR;
 			ctx->ch_client_ctx->close_read();
 			ctx->ch_stream_ctx->close();
 		}
 	}
-	inline void ctx_up(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& income, bool flush = true) {
+	inline void __ctx_up(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& income ) {
 		WAWO_ASSERT(ctx->ch_client_ctx->event_poller()->in_event_loop());
 		if (income != NULL) {
 			ctx->up_to_stream_packets.push(income);
 		}
-		if (ctx->up_state == WS_WRITING || !flush) {
+		if (ctx->up_state != ctx_write_state::S_IDLE ) {
 			return;
 		}
 		_do_ctx_up(ctx);
@@ -188,8 +196,8 @@ namespace roger {
 				ctx_down_done(ctx, f->get());
 			});
 			WAWO_ASSERT(ctx->ch_client_ctx != NULL);
-			WAWO_ASSERT(ctx->down_state == WS_IDLE);
-			ctx->down_state = WS_WRITING;
+			WAWO_ASSERT(ctx->down_state == ctx_write_state::S_IDLE);
+			ctx->down_state = ctx_write_state::S_WRITING;
 			WWRP<wawo::packet>& outp = ctx->down_to_client_packets.front();
 			WAWO_ASSERT(outp->len() > 0);
 			ctx->ch_client_ctx->write(outp, f);
@@ -200,14 +208,20 @@ namespace roger {
 				TRACE_CLIENT_SIDE_CTX("[client][#%u]stream(down) read closed already, close client write", ctx->ch_client_ctx->ch->ch_id() );
 				ctx->ch_client_ctx->close_write();
 			}
+			else {
+				if (ctx->ch_stream_read_chocked) {
+					ctx->ch_stream_read_chocked =false;
+					ctx->ch_stream_ctx->ch->ch_async_io_begin_read();
+				}
+			}
 		}
 	}
 
 	inline void ctx_down_done(WWRP<proxy_ctx> const& ctx, int flushrt ) {
 		WAWO_ASSERT(ctx->ch_client_ctx->event_poller()->in_event_loop());
-		WAWO_ASSERT(ctx->down_state == WS_WRITING);
-		ctx->down_state = WS_IDLE;
+		WAWO_ASSERT(ctx->down_state == ctx_write_state::S_WRITING);
 		if (flushrt == wawo::OK) {
+			ctx->down_state = ctx_write_state::S_IDLE;
 			WAWO_ASSERT(ctx->down_to_client_packets.size());
 			ctx->ndownbytes += ctx->down_to_client_packets.front()->len();
 			ctx->down_to_client_packets.pop();
@@ -215,8 +229,11 @@ namespace roger {
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK)
 		{
+			ctx->down_state = ctx_write_state::S_BLOCK;
 		}
 		else {
+			ctx->down_state = ctx_write_state::S_ERROR;
+
 			if (ctx->ch_stream_ctx != NULL) {
 				ctx->ch_stream_ctx->close_read();
 			}
@@ -224,14 +241,14 @@ namespace roger {
 		}
 	}
 
-	inline void ctx_down(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& income, bool flush = true ) {
+	inline void ctx_down(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& income ) {
 		WAWO_ASSERT(ctx->ch_client_ctx->event_poller()->in_event_loop());
 
 		if (income != NULL) {
 			WAWO_ASSERT(income->len() > 0);
 			ctx->down_to_client_packets.push(income);
 		}
-		if (ctx->down_state == WS_WRITING || !flush) {
+		if (ctx->down_state != ctx_write_state::S_IDLE) {
 			return;
 		}
 		_do_ctx_down(ctx);
@@ -300,7 +317,7 @@ namespace roger {
 		return _p;
 	}
 
-	static inline void http_up(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& up) {
+	static inline void ctx_up(WWRP<proxy_ctx> const& ctx, WWRP<wawo::packet> const& up) {
 
 		switch (ctx->state) {
 		case PIPE_DIALING_STREAM:
@@ -319,13 +336,13 @@ namespace roger {
 		{
 			while (ctx->pending_outp.size()) {
 				WWRP<wawo::packet>& t = ctx->pending_outp.front();
-				ctx_up(ctx, t);
+				__ctx_up(ctx, t);
 				ctx->pending_outp.pop();
 			}
 			WAWO_ASSERT(ctx->pending_outp.size() == 0);
 			std::queue<WWRP<wawo::packet>>().swap(ctx->pending_outp);
 			WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
-			ctx_up(ctx, up);
+			__ctx_up(ctx, up);
 		}
 		break;
 		case PIPE_DIAL_SERVER_FAILED:
@@ -609,7 +626,7 @@ namespace roger {
 						WWRP<wawo::packet> _up = wawo::make_ref<wawo::packet>(pctx->protocol_packet->len());
 						_up->write(pctx->protocol_packet->begin(), pctx->protocol_packet->len());
 						pctx->protocol_packet->reset();
-						ctx_up(pctx,_up,false);
+						ctx_up(pctx,_up);
 					}
 				}
 
@@ -626,11 +643,11 @@ namespace roger {
 							resp_connect_result_to_client(pctx, downp, code);
 							//in case client read closed before stream established
 							if (pctx->client_read_closed == true) {
-								if (pctx->type == T_HTTP) {
-									http_up(pctx, NULL);
-								} else {
+								//if (pctx->type == T_HTTP) {
 									ctx_up(pctx, NULL);
-								}
+								//} else {
+								//	ctx_up(pctx, NULL);
+								//}
 							}
 							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]send connect cmd failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code);
 						});
@@ -663,7 +680,7 @@ namespace roger {
 
 					//have to fake client read close to recycle stream
 					pctx->client_read_closed = true;
-					http_up(pctx, NULL);
+					ctx_up(pctx, NULL);
 				} else {
 					ctx_down(pctx, NULL);
 				}
@@ -714,21 +731,21 @@ namespace roger {
 						int32_t code = income->read<int32_t>();
 						if (WAWO_LIKELY(code == wawo::OK)) {
 							pctx->state = PIPE_DIAL_SERVER_OK;
-							if (pctx->type == T_HTTP) {
-								http_up(pctx, NULL);
-							} else {
+							//if (pctx->type == T_HTTP) {
 								ctx_up(pctx, NULL);
-							}
+							//} else {
+							//	ctx_up(pctx, NULL);
+							//}
 						} else {
 							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]connect failed: %d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code );
 							pctx->state = PIPE_DIAL_SERVER_FAILED;
 							if (pctx->client_read_closed == true) {
-								if (pctx->type == T_HTTP) {
-									http_up(pctx, NULL);
-								}
-								else {
+								//if (pctx->type == T_HTTP) {
+								//	http_up(pctx, NULL);
+								//}
+								//else {
 									ctx_up(pctx, NULL);
-								}
+								//}
 							}
 						}
 						resp_connect_result_to_client(pctx, income, code);
@@ -763,15 +780,24 @@ namespace roger {
 			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
 			WAWO_ASSERT(pctx != NULL);
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
-			pctx->ch_client_ctx->ch->ch_async_io_end_read();
+
+			pctx->ch_client_ctx->event_poller()->execute([pctx](){
+				WAWO_ASSERT(pctx->up_state == ctx_write_state::S_BLOCK);
+				pctx->ch_client_ctx->ch->ch_async_io_end_read();
+				pctx->ch_client_read_chocked = true;
+			});
 		}
 
 		void write_unblock(WWRP<channel_handler_context> const& ctx) {
 			WWRP<proxy_ctx> pctx = ctx->ch->get_ctx<proxy_ctx>();
 			WAWO_ASSERT(pctx != NULL);
 			WAWO_ASSERT(pctx->ch_client_ctx != NULL);
-			pctx->ch_client_ctx->ch->ch_async_io_begin_read();
+			//pctx->ch_client_ctx->ch->ch_async_io_begin_read();
+
 			pctx->ch_client_ctx->event_poller()->execute([pctx]() {
+				WAWO_ASSERT(pctx->up_state == ctx_write_state::S_BLOCK);
+				WAWO_ASSERT(pctx->ch_client_read_chocked == true);
+				pctx->up_state = ctx_write_state::S_IDLE;
 				ctx_up(pctx, NULL);
 			});
 		}
@@ -787,13 +813,16 @@ namespace roger {
 			ctx->ch->set_ctx(ppctx);
 
 			ppctx->state = WAIT_FIRST_PACK;
-			ppctx->down_state = WS_IDLE;
-			ppctx->up_state = WS_IDLE;
+			ppctx->down_state = ctx_write_state::S_IDLE;
+			ppctx->up_state = ctx_write_state::S_IDLE;
 			ppctx->client_read_closed = false;
 			ppctx->stream_read_closed = false;
 			ppctx->ch_client_ctx = ctx;
 			ppctx->protocol_packet = wawo::make_ref<wawo::packet>();
 			ppctx->type = T_NONE;
+
+			ppctx->ch_client_read_chocked = false;
+			ppctx->ch_stream_read_chocked = false;
 
 			TRACE_CLIENT_SIDE_CTX("[roger][#%u]client connected", ctx->ch->ch_id());
 		}
@@ -810,7 +839,7 @@ namespace roger {
 					WAWO_ASSERT(_pctx->http_req_parser == NULL);
 
 					_pctx->client_read_closed = true;
-					http_up(_pctx, NULL);
+					ctx_up(_pctx, NULL);
 				});
 			} else {
 				ctx_up(ppctx, NULL);
@@ -834,16 +863,21 @@ namespace roger {
 
 		void write_block(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WWRP<proxy_ctx> ppctx = ctx->ch->get_ctx<proxy_ctx>();
+			WAWO_ASSERT(ppctx->down_state == ctx_write_state::S_BLOCK);
 			if (ppctx->ch_stream_ctx != NULL) {
 				ppctx->ch_stream_ctx->ch->ch_async_io_end_read();
+				ppctx->ch_stream_read_chocked = true;
 			}
 		}
 
 		void write_unblock(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WWRP<proxy_ctx> ppctx = ctx->ch->get_ctx<proxy_ctx>();
-			if (ppctx->ch_stream_ctx != NULL) {
-				ppctx->ch_stream_ctx->ch->ch_async_io_begin_read();
-			}
+			WAWO_ASSERT(ppctx->ch_stream_read_chocked == true);
+			WAWO_ASSERT(ppctx->down_state == ctx_write_state::S_BLOCK);
+			ppctx->down_state = ctx_write_state::S_IDLE;
+			//if (ppctx->ch_stream_ctx != NULL) {
+			//	ppctx->ch_stream_ctx->ch->ch_async_io_begin_read();
+			//}
 			//TRY TO FLUSH IF NECESSARY
 			if (ppctx->type == T_HTTP) {
 				http_down(ppctx, NULL );
@@ -1080,7 +1114,7 @@ namespace roger {
 			{
 				WAWO_ASSERT(ppctx->protocol_packet->len() == 0);
 				WAWO_ASSERT(income != NULL);
-				ctx_up(ppctx, income,false);
+				ctx_up(ppctx, income);
 			}
 			break;
 			case PIPE_DIAL_SERVER_OK:

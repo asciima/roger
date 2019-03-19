@@ -11,7 +11,7 @@ namespace roger {
 	void flush_up_done(WWRP<forward_ctx> const& fctx, int flushrt);
 	inline void _do_flush_up(WWRP<forward_ctx> const& fctx) {
 		WAWO_ASSERT(fctx->ch_stream_ctx->event_poller()->in_event_loop());
-		WAWO_ASSERT(fctx->up_state == ctx_write_state::WS_IDLE);
+		WAWO_ASSERT(fctx->up_state == ctx_write_state::S_IDLE);
 		switch (fctx->state) {
 			case LOOKUP_SERVER_NAME:
 			case DIAL_SERVER:
@@ -30,8 +30,8 @@ namespace roger {
 						});
 					});
 
-					WAWO_ASSERT(fctx->up_state == ctx_write_state::WS_IDLE);
-					fctx->up_state = ctx_write_state::WS_WRITING;
+					WAWO_ASSERT(fctx->up_state == ctx_write_state::S_IDLE);
+					fctx->up_state = ctx_write_state::S_WRITING;
 					WAWO_ASSERT(fctx->up_to_server_packets.size());
 					WWRP<packet>& outp = fctx->up_to_server_packets.front();
 					fctx->ch_server_ctx->write(outp, f);
@@ -41,6 +41,12 @@ namespace roger {
 					if (fctx->stream_read_closed) {
 						TRACE_SERVER_SIDE_CTX("[server][s%u]no up to server packets left and stream read closed, close server write", fctx->ch_stream_ctx->ch->ch_id());
 						fctx->ch_server_ctx->close_write();
+					}
+					else {
+						if (fctx->ch_stream_read_chocked) {
+							fctx->ch_stream_read_chocked = false;
+							fctx->ch_stream_ctx->ch->ch_async_io_begin_read();
+						}
 					}
 				}
 			}
@@ -56,17 +62,18 @@ namespace roger {
 	}
 	inline void flush_up_done(WWRP<forward_ctx> const& fctx, int flushrt ) {
 		WAWO_ASSERT(fctx->ch_stream_ctx->event_poller()->in_event_loop());
-		WAWO_ASSERT(fctx->up_state == ctx_write_state::WS_WRITING);
-		fctx->up_state = ctx_write_state::WS_IDLE;
+		WAWO_ASSERT(fctx->up_state == ctx_write_state::S_WRITING);
 		if (flushrt == wawo::OK) {
+			fctx->up_state = ctx_write_state::S_IDLE;
 			TRACE_SERVER_SIDE_CTX("[server][s%u]write to server done: %u",fctx->ch_stream_ctx->ch->ch_id(), fctx->up_to_server_packets.front()->len() );
 			WAWO_ASSERT(fctx->up_to_server_packets.size());
 			fctx->up_to_server_packets.pop();
 			_do_flush_up(fctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
-		}
-		else {
+			fctx->up_state = ctx_write_state::S_BLOCK;
+		} else {
+			fctx->up_state = ctx_write_state::S_ERROR;
 			fctx->ch_stream_ctx->close_read();
 			fctx->ch_server_ctx->close();
 		}
@@ -76,7 +83,7 @@ namespace roger {
 		if (income != NULL) {
 			fctx->up_to_server_packets.push(income);
 		}
-		if (fctx->up_state == ctx_write_state::WS_WRITING ) {
+		if (fctx->up_state != ctx_write_state::S_IDLE ) {
 			return;
 		}
 		_do_flush_up(fctx);
@@ -85,6 +92,8 @@ namespace roger {
 	void flush_down_done(WWRP<forward_ctx> const& fctx, int flushrt);
 	inline void _do_flush_down(WWRP<forward_ctx> const& fctx) {
 		WAWO_ASSERT(fctx->ch_stream_ctx->event_poller()->in_event_loop());
+		WAWO_ASSERT(fctx->down_state == ctx_write_state::S_IDLE);
+
 		if (fctx->down_to_stream_packets.size()) {
 			WWRP<wawo::net::channel_promise> f = fctx->ch_stream_ctx->make_channel_promise();
 			f->add_listener([fctx](WWRP<wawo::net::channel_future> const& f) {
@@ -93,26 +102,33 @@ namespace roger {
 				});
 			});
 
-			WAWO_ASSERT(fctx->down_state == ctx_write_state::WS_IDLE);
-			fctx->down_state = ctx_write_state::WS_WRITING;
+			fctx->down_state = ctx_write_state::S_WRITING;
 			WAWO_ASSERT(fctx->down_to_stream_packets.size());
 			WWRP<packet> outp = fctx->down_to_stream_packets.front();
 			fctx->ch_stream_ctx->write(outp, f);
 		} else {
 			packet_queue().swap(fctx->down_to_stream_packets);
+			
 			if (fctx->server_read_closed) {
 				TRACE_SERVER_SIDE_CTX("[server][s%u]no down packets left and server_read_closed, close stream write", fctx->ch_stream_ctx->ch->ch_id());
 				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
 				fctx->ch_stream_ctx->close_write();
+			}
+			else {
+				if (fctx->ch_server_read_chocked == true) {
+					fctx->ch_server_read_chocked =false;
+					fctx->ch_server_ctx->ch->ch_async_io_begin_read();
+				}
 			}
 		}
 	}
 
 	inline void flush_down_done(WWRP<forward_ctx> const& fctx, int flushrt) {
 		WAWO_ASSERT(fctx->ch_stream_ctx->event_poller()->in_event_loop());
-		WAWO_ASSERT(fctx->down_state == ctx_write_state::WS_WRITING);
-		fctx->down_state = ctx_write_state::WS_IDLE;
+		WAWO_ASSERT(fctx->down_state == ctx_write_state::S_WRITING);
 		if (flushrt == wawo::OK) {
+			fctx->down_state = ctx_write_state::S_IDLE;
+
 			WAWO_ASSERT(fctx->down_to_stream_packets.size());
 			fctx->ndownbytes += fctx->down_to_stream_packets.front()->len();
 			fctx->down_to_stream_packets.pop();
@@ -120,8 +136,12 @@ namespace roger {
 			_do_flush_down(fctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
+			fctx->down_state = ctx_write_state::S_BLOCK;
+			TRACE_SERVER_SIDE_CTX("[server][s%u]write to stream block", fctx->ch_stream_ctx->ch->ch_id());
 		}
 		else {
+			fctx->down_state = ctx_write_state::S_ERROR;
+
 			if (fctx->ch_server_ctx != NULL) {
 				fctx->ch_server_ctx->close_read();
 			}
@@ -136,9 +156,10 @@ namespace roger {
 		if (income != NULL) {
 			fctx->down_to_stream_packets.push(income);
 		}
-		if (fctx->down_state == ctx_write_state::WS_WRITING ) {
+		if (fctx->down_state != ctx_write_state::S_IDLE ) {
 			return;
 		}
+		TRACE_SERVER_SIDE_CTX("[server][s%u]server write, %u, flush", fctx->ch_stream_ctx->ch->ch_id(), income != NULL ? income->len():0);
 		_do_flush_down(fctx);
 	}
 
@@ -195,14 +216,20 @@ namespace roger {
 		void write_block(WWRP<channel_handler_context> const& ctx) {
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
+			WAWO_ASSERT(fctx->up_state == ctx_write_state::S_BLOCK);
 			fctx->ch_stream_ctx->ch->ch_async_io_end_read();
+			fctx->ch_stream_read_chocked = true;
+			TRACE_SERVER_SIDE_CTX("[server][s%u]server write block", fctx->ch_stream_ctx->ch->ch_id());
 		}
 
 		void write_unblock(WWRP<channel_handler_context> const& ctx) {
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
-			fctx->ch_stream_ctx->ch->ch_async_io_begin_read();
+			WAWO_ASSERT(fctx->ch_stream_read_chocked == true);
+			WAWO_ASSERT(fctx->up_state == ctx_write_state::S_BLOCK);
+			fctx->up_state = ctx_write_state::S_IDLE;
 			flush_up(fctx,NULL);
+			TRACE_SERVER_SIDE_CTX("[server][s%u]server write unblock", fctx->ch_stream_ctx->ch->ch_id());
 		}
 
 		void read(WWRP<wawo::net::channel_handler_context> const& ctx, WWRP<wawo::packet> const& income) {
@@ -351,8 +378,11 @@ namespace roger {
 			ctx->ch->set_ctx(fctx);
 			fctx->state = CONNECT;
 
-			fctx->up_state = ctx_write_state::WS_IDLE;
-			fctx->down_state = ctx_write_state::WS_IDLE;
+			fctx->up_state = ctx_write_state::S_IDLE;
+			fctx->down_state = ctx_write_state::S_IDLE;
+
+			fctx->ch_server_read_chocked =false;
+			fctx->ch_stream_read_chocked = false;
 
 			fctx->stream_read_closed = false;
 			fctx->server_read_closed = false;
@@ -542,20 +572,25 @@ namespace roger {
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
 			WAWO_ASSERT(fctx->ch_stream_ctx == ctx);
-			TRACE_SERVER_SIDE_CTX("[server][s%u]stream write blocked", fctx->ch_stream_ctx->ch->ch_id());
+			TRACE_SERVER_SIDE_CTX("[server][s%u]stream write blocked, fctx->down_state: %u", fctx->ch_stream_ctx->ch->ch_id(), fctx->down_state );
+			WAWO_ASSERT(fctx->down_state == ctx_write_state::S_BLOCK);
 			fctx->ch_server_ctx->ch->ch_async_io_end_read();
+			fctx->ch_server_read_chocked=true;
 		}
 
 		void write_unblock(WWRP<wawo::net::channel_handler_context> const& ctx) {
 			WWRP<forward_ctx> fctx = ctx->ch->get_ctx<forward_ctx>();
 			WAWO_ASSERT(fctx != NULL);
 			TRACE_SERVER_SIDE_CTX("[server][s%u]stream write unblocked", fctx->ch_stream_ctx->ch->ch_id());
+			WAWO_ASSERT(fctx->ch_stream_ctx == ctx);
+			WAWO_ASSERT(fctx->ch_server_read_chocked == true);
 
-			fctx->ch_stream_ctx->event_poller()->execute([fctx,ctx]() {
-				WAWO_ASSERT(fctx->ch_stream_ctx == ctx);
-				fctx->ch_server_ctx->ch->ch_async_io_begin_read();
-				flush_down(fctx, NULL);
-			});
+			//moved to flush_down
+			//fctx->ch_server_ctx->ch->ch_async_io_begin_read();
+
+			WAWO_ASSERT(fctx->down_state == ctx_write_state::S_BLOCK);
+			fctx->down_state = ctx_write_state::S_IDLE;
+			flush_down(fctx, NULL);
 		}
 	};
 
