@@ -129,6 +129,7 @@ namespace roger {
 					packet_queue().swap(ctx->up_to_stream_packets);
 					if (ctx->client_read_closed == true) {
 						if (ctx->ch_stream_ctx != NULL) {
+							WAWO_TRACE_STREAM("[client][#%u][s%u]client read closed, close stream write",ctx->ch_client_ctx->ch->ch_id(), ctx->ch_stream_ctx->ch->ch_id());
 							ctx->ch_stream_ctx->close_write();
 						}
 					} else {
@@ -144,6 +145,7 @@ namespace roger {
 			{
 				WAWO_ASSERT(ctx->client_read_closed == true);
 				WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
+				WAWO_TRACE_STREAM("[client][s%u]dial server failed, close stream", ctx->ch_stream_ctx->ch->ch_id() );
 				ctx->ch_stream_ctx->close_write();
 			}
 			break;
@@ -348,9 +350,15 @@ namespace roger {
 		case PIPE_DIAL_SERVER_FAILED:
 		{
 			WAWO_ASSERT(ctx->ch_stream_ctx != NULL);
-			//in case of dial failure, we close client
-			//WAWO_ASSERT(up == NULL);
-			//ctx_up(ctx, up);
+			WAWO_ASSERT(ctx->ch_client_ctx != NULL);
+			ctx->ch_client_ctx->close();
+			ctx->ch_stream_ctx->close();
+		}
+		break;
+		case PIPE_DIAL_STREAM_FAILED:
+		case WAIT_FIRST_PACK:
+		{
+			WAWO_ASSERT(ctx->ch_stream_ctx == NULL);
 			WAWO_ASSERT(ctx->ch_client_ctx != NULL);
 			ctx->ch_client_ctx->close();
 		}
@@ -643,11 +651,7 @@ namespace roger {
 							resp_connect_result_to_client(pctx, downp, code);
 							//in case client read closed before stream established
 							if (pctx->client_read_closed == true) {
-								//if (pctx->type == T_HTTP) {
-									ctx_up(pctx, NULL);
-								//} else {
-								//	ctx_up(pctx, NULL);
-								//}
+								ctx_up(pctx, NULL);
 							}
 							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]send connect cmd failed:%d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code);
 						});
@@ -676,7 +680,7 @@ namespace roger {
 					roger::cancel_all_ctx_reqs(pctx, CANCEL_CODE_SERVER_NO_RESPONSE);
 
 					ppctx->http_proxy_ctx_map.erase(pctx->HP_key);
-					TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]erase from ppctx", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
+					TRACE_HTTP_PROXY("[roger][#%u][s%u][%s]stream read closed, erase from ppctx", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->HP_key.c_str());
 
 					//have to fake client read close to recycle stream
 					pctx->client_read_closed = true;
@@ -731,21 +735,12 @@ namespace roger {
 						int32_t code = income->read<int32_t>();
 						if (WAWO_LIKELY(code == wawo::OK)) {
 							pctx->state = PIPE_DIAL_SERVER_OK;
-							//if (pctx->type == T_HTTP) {
-								ctx_up(pctx, NULL);
-							//} else {
-							//	ctx_up(pctx, NULL);
-							//}
+							ctx_up(pctx, NULL);
 						} else {
 							WAWO_WARN("[client][#%u][s%u][%s][%s:%u]connect failed: %d", pctx->ch_client_ctx->ch->ch_id(), pctx->ch_stream_ctx->ch->ch_id(), pctx->dst_domain.c_str(), wawo::net::ipv4todotip(pctx->dst_ipv4).c_str(), pctx->dst_port, code );
 							pctx->state = PIPE_DIAL_SERVER_FAILED;
 							if (pctx->client_read_closed == true) {
-								//if (pctx->type == T_HTTP) {
-								//	http_up(pctx, NULL);
-								//}
-								//else {
-									ctx_up(pctx, NULL);
-								//}
+								ctx_up(pctx, NULL);
 							}
 						}
 						resp_connect_result_to_client(pctx, income, code);
@@ -839,6 +834,8 @@ namespace roger {
 					WAWO_ASSERT(_pctx->http_req_parser == NULL);
 
 					_pctx->client_read_closed = true;
+					TRACE_HTTP_PROXY("[roger][http][#%u][s%u][%s]client read closed, force close all http connection", _pctx->ch_client_ctx->ch->ch_id(), _pctx->ch_stream_ctx->ch->ch_id(), _pctx->HP_key.c_str());
+
 					ctx_up(_pctx, NULL);
 				});
 			} else {
@@ -1146,7 +1143,7 @@ namespace roger {
 						WWRP<wawo::packet> downp = wawo::make_ref<packet>(64);
 						downp->write((wawo::byte_t*)HTTP_RESP_BAD_REQUEST, wawo::strlen(HTTP_RESP_BAD_REQUEST) );
 						http_down(ppctx, downp);
-						ppctx->state = HTTP_PARSE_ERROR;
+						ppctx->state = HTTP_REQ_PARSE_ERROR;
 						ppctx->stream_read_closed = true;
 						http_down(ppctx, NULL);
 						//double confirm close immediately
@@ -1188,7 +1185,7 @@ namespace roger {
 				//WAWO_ASSERT(!"TODO"); //check whether code has been forwarded
 			}
 			break;
-			case HTTP_PARSE_ERROR:
+			case HTTP_REQ_PARSE_ERROR:
 			{
 				WAWO_ASSERT(ppctx->ch_client_ctx != NULL);
 				ppctx->ch_client_ctx->close();

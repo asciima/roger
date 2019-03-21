@@ -14,9 +14,9 @@
 #define FORCE_WCP 1
 
 #ifdef _DEBUG
-	//#define DEBUG_HTTP_PROXY
+	#define ENABLE_DEBUG_HTTP_PROXY
 	#define ENABLE_TRACE_SERVER_SIDE_CTX
-	//#define ENABLE_TRACE_CLIENT_SIDE_CTX
+	#define ENABLE_TRACE_CLIENT_SIDE_CTX
 #endif
 
 //#define ENABLE_TRACE_SERVER_SIDE_CTX
@@ -166,7 +166,7 @@ namespace roger {
 		PIPE_DIAL_SERVER_OK,
 		PIPE_DIAL_SERVER_FAILED,
 
-		HTTP_PARSE_ERROR,
+		HTTP_REQ_PARSE_ERROR,
 
 		PS_MAX
 	};
@@ -299,6 +299,7 @@ namespace roger {
 
 	typedef std::queue< WWRP<wawo::net::http::message> > message_queue;
 	typedef std::queue< WWRP<wawo::packet> > packet_queue;
+	typedef std::deque< WWRP<wawo::packet> > packet_deque;
 
 	struct async_dns_query;
 	class roger_client;
@@ -325,8 +326,8 @@ namespace roger {
 		bool ch_server_read_chocked;
 		bool ch_stream_read_chocked;
 		WWRP<wawo::packet> client_up_first_packet; //first req packet
-		packet_queue up_to_server_packets;
-		packet_queue down_to_stream_packets;
+		packet_deque up_to_server_packets;
+		packet_deque down_to_stream_packets;
 		u32_t ndownbytes;
 		server_state state;
 		ctx_write_state up_state;
