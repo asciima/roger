@@ -1054,16 +1054,16 @@ namespace roger {
 
 				int ec;
 				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid,ec);
-				WAWO_DEBUG("[client][#%u]dial mux_stream begin:%d, target addr: %s:%u"
-					, sid, ec, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
+				WAWO_DEBUG("[client][#%u]dial mux_stream begin:%d, domain: %s, target addr: %s:%u"
+					, sid, ec, ppctx->dst_domain.c_str(), wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
 
 				if (ec != wawo::OK) {
 					ppctx->state = PIPE_DIAL_STREAM_FAILED;
 					WWRP<packet> downp = wawo::make_ref<packet>(64);
 					resp_connect_result_to_client(ppctx, downp, ec);
 					ppctx->ch_client_ctx->close();
-					WAWO_WARN("[client][#%u]dial mux_stream failed:%d, target addr: %s:%u"
-						, sid, ec, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
+					WAWO_WARN("[client][#%u]dial mux_stream failed:%d, domain: %s, target addr: %s:%u"
+						, sid, ec, ppctx->dst_domain.c_str(), wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
 					return;
 				}
 
@@ -1078,15 +1078,15 @@ namespace roger {
 					ppctx->ch_client_ctx->event_poller()->execute([ppctx,sid,rt,f]() {
 						if (rt == wawo::OK) {
 							ppctx->state = PIPE_DIAL_STREAM_OK;
-							WAWO_DEBUG("[client][#%u]dial mux_stream done, ok, target addr: %s:%u"
-								, sid, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
+							WAWO_DEBUG("[client][#%u]dial mux_stream done, ok, domain: %s, target addr: %s:%u"
+								, sid, ppctx->dst_domain.c_str(), wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
 						} else {
 							ppctx->state = PIPE_DIAL_STREAM_FAILED;
 							WWRP<packet> downp = wawo::make_ref<packet>(64);
 							resp_connect_result_to_client(ppctx, downp, rt);
 							ppctx->ch_client_ctx->close();
-							WAWO_WARN("[client][#%u]dial mux_stream done failed:%d, target addr: %s:%u"
-								, sid, rt, wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
+							WAWO_WARN("[client][#%u]dial mux_stream done failed:%d, domain: %s, target addr: %s:%u"
+								, sid, rt, ppctx->dst_domain.c_str(), wawo::net::ipv4todotip(ppctx->dst_ipv4).c_str(), ppctx->dst_port);
 						}
 					});
 				});
