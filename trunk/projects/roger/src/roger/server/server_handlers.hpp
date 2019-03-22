@@ -37,7 +37,6 @@ namespace roger {
 					fctx->ch_server_ctx->write(outp, f);
 				}
 				else {
-					packet_deque().swap(fctx->up_to_server_packets);
 					if (fctx->stream_read_closed) {
 						TRACE_SERVER_SIDE_CTX("[server][s%u]no up to server packets left and stream read closed, close server write", fctx->ch_stream_ctx->ch->ch_id());
 						fctx->ch_server_ctx->close_write();
@@ -68,6 +67,9 @@ namespace roger {
 			TRACE_SERVER_SIDE_CTX("[server][s%u]write to server done: %u",fctx->ch_stream_ctx->ch->ch_id(), fctx->up_to_server_packets.front()->len() );
 			WAWO_ASSERT(fctx->up_to_server_packets.size());
 			fctx->up_to_server_packets.pop_front();
+			if (fctx->up_to_server_packets.size() == 0) {
+				fctx->up_to_server_packets.shrink_to_fit();
+			} 
 			_do_flush_up(fctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
@@ -81,11 +83,12 @@ namespace roger {
 	inline void flush_up(WWRP<forward_ctx> const& fctx, WWRP<wawo::packet> const& income ) {
 		WAWO_ASSERT(fctx->ch_stream_ctx->event_poller()->in_event_loop());
 		if (income != NULL) {
-			if(fctx->up_to_server_packets.empty()) {
+			
+			if(fctx->up_to_server_packets.size()<= ((fctx->up_state == ctx_write_state::S_WRITING) ? 1: 0)) {
 				fctx->up_to_server_packets.push_back(income);
 			} else {
 				WWRP<wawo::packet>& back = fctx->up_to_server_packets.back();
-				if ((back->len() + income->len()) > 32 * 1024) {
+				if ((back->len() + income->len()) >32*1024 ) {
 					fctx->up_to_server_packets.push_back(income);
 				} else {
 					back->write(income->begin(), income->len());
@@ -113,13 +116,8 @@ namespace roger {
 
 			fctx->down_state = ctx_write_state::S_WRITING;
 			WWRP<packet> outp = fctx->down_to_stream_packets.front();
-
-			//while( outp->len() < (32*1024) && fctx->down_to_stream_packets.size() > 1)
-
 			fctx->ch_stream_ctx->write(outp, f);
-		} else {
-			packet_deque().swap(fctx->down_to_stream_packets);
-			
+		} else {	
 			if (fctx->server_read_closed) {
 				TRACE_SERVER_SIDE_CTX("[server][s%u]no down packets left and server_read_closed, close stream write", fctx->ch_stream_ctx->ch->ch_id());
 				WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
@@ -143,7 +141,9 @@ namespace roger {
 			WAWO_ASSERT(fctx->down_to_stream_packets.size());
 			fctx->ndownbytes += fctx->down_to_stream_packets.front()->len();
 			fctx->down_to_stream_packets.pop_front();
-
+			if (fctx->down_to_stream_packets.size() == 0) {
+				fctx->down_to_stream_packets.shrink_to_fit();
+			}
 			_do_flush_down(fctx);
 		}
 		else if (flushrt == wawo::E_CHANNEL_WRITE_BLOCK) {
@@ -165,14 +165,14 @@ namespace roger {
 		WAWO_ASSERT(fctx->ch_stream_ctx != NULL);
 		WAWO_ASSERT(fctx->ch_stream_ctx->event_poller()->in_event_loop());
 		if (income != NULL) {
-			if(fctx->down_to_stream_packets.empty() ) {
+			if(fctx->down_to_stream_packets.size()<= ((fctx->down_state == ctx_write_state::S_WRITING) ? 1 : 0)) {
 				fctx->down_to_stream_packets.push_back(income);
 			} else {
 				WWRP<wawo::packet>& back = fctx->down_to_stream_packets.back();
-				if ( (back->len() + income->len()) < (32*1024)) {
-					back->write( income->begin(), income->len());
-				} else {
+				if ( (back->len() + income->len()) > (32*1024)) {
 					fctx->down_to_stream_packets.push_back(income);
+				} else {
+					back->write(income->begin(), income->len());
 				}
 			}
 		}
