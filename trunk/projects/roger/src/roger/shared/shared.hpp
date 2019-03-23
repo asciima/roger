@@ -378,10 +378,10 @@ namespace roger {
 	};
 
 	const static wawo::net::socket_cfg mux_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 8*1024*1024,8*1024*1024 }, default_keep_alive_vals);
-	const static wawo::net::socket_buffer_cfg mux_stream_sbc = { 1024*1024*8,1024*1024*8 };
+	const static wawo::net::socket_buffer_cfg mux_stream_sbc = { 1024*1024,1024*1024 };
 
-	const static wawo::net::socket_cfg client_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 1024 * 1024*2,1024 * 1024*2 }, default_keep_alive_vals);
-	const static wawo::net::socket_cfg server_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 1024 * 1024*2,1024 * 1024*2 }, default_keep_alive_vals);
+	const static wawo::net::socket_cfg client_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 1024 * 512,1024 * 512 }, default_keep_alive_vals);
+	const static wawo::net::socket_cfg server_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 1024 * 512,1024 * 512 }, default_keep_alive_vals);
 
 	const static wawo::net::socket_cfg http_server_cfg = wawo::net::socket_cfg(wawo::net::OPTION_NON_BLOCKING, { 256 * 1024,256 * 1024 }, default_keep_alive_vals);
 	const static wawo::u32_t http_resp_rb_size = (256*1024);

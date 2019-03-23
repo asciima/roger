@@ -1051,6 +1051,7 @@ namespace roger {
 				WAWO_ASSERT(mux_ != NULL);
 				wawo::net::handler::mux_stream_id_t sid=wawo::net::handler::mux_make_stream_id();
 				ppctx->state = PIPE_DIALING_STREAM;
+				ppctx->stream_id = sid;
 
 				int ec;
 				WWRP<wawo::net::handler::mux_stream> muxs = mux_->open_stream(sid,ec);
