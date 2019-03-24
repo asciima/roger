@@ -68,7 +68,7 @@ namespace roger {
 			WAWO_ASSERT(fctx->up_to_server_packets.size());
 			fctx->up_to_server_packets.pop_front();
 			if (fctx->up_to_server_packets.size() == 0) {
-				fctx->up_to_server_packets.shrink_to_fit();
+				packet_deque(fctx->up_to_server_packets);
 			} 
 			_do_flush_up(fctx);
 		}
@@ -139,10 +139,9 @@ namespace roger {
 			fctx->down_state = ctx_write_state::S_IDLE;
 
 			WAWO_ASSERT(fctx->down_to_stream_packets.size());
-			fctx->ndownbytes += fctx->down_to_stream_packets.front()->len();
 			fctx->down_to_stream_packets.pop_front();
 			if (fctx->down_to_stream_packets.size() == 0) {
-				fctx->down_to_stream_packets.shrink_to_fit();
+				packet_deque().swap(fctx->down_to_stream_packets);
 			}
 			_do_flush_down(fctx);
 		}

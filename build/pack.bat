@@ -13,6 +13,7 @@ echo %CD%
 
 COPY /Y "..\build\readme.txt" ".\%YMDHM%\"
 COPY /Y "..\build\start_roger_wcp.bat" ".\%YMDHM%\"
+COPY /Y "..\build\start_roger_wcp_local_server.bat" ".\%YMDHM%\"
 
 
 XCOPY /S /Q /Y "..\trunk\projects\roger\projects\msvc\roger_client\Debug\roger_Debug.exe" ".\%YMDHM%\"
@@ -28,7 +29,7 @@ XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\x86_64\roger_client.x86_6
 XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\x86_64\roger_server.x86_64_debug" ".\%YMDHM%\"
 XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\x86_64\roger_server.x86_64_release" ".\%YMDHM%\"
 
-XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7ahf\roger_client.armv7ahf_debug" ".\%YMDHM%\"
-XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7ahf\roger_client.armv7ahf_release" ".\%YMDHM%\"
-XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7ahf\roger_server.armv7ahf_debug" ".\%YMDHM%\"
-XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7ahf\roger_server.armv7ahf_release" ".\%YMDHM%\"
+XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7a\roger_client.armv7a_debug" ".\%YMDHM%\"
+XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7a\roger_client.armv7a_release" ".\%YMDHM%\"
+XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7a\roger_server.armv7a_debug" ".\%YMDHM%\"
+XCOPY /S /Q /Y "..\trunk\projects\roger\projects\build\armv7a\roger_server.armv7a_release" ".\%YMDHM%\"

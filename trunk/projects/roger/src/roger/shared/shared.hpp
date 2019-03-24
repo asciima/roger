@@ -227,17 +227,17 @@ namespace roger {
 	};
 
 	enum server_error_code {
-		E_UNKNOWN_CMD = -40001,
-		E_INVALID_DOMAIN = -40002,
-		E_INVALID_IPV4 = -40003,
-		E_DNSLOOKUP_RETURN_NO_IP = -40004,
-		E_DNS_TEMPORARY_ERROR = -40005,
-		E_DNS_PROTOCOL_ERROR = -40006,
-		E_DNS_DOMAIN_NAME_NOT_EXISTS = -40007,
-		E_DNS_DOMAIN_NO_DATA = -40008,
-		E_DNS_NOMEM = -40009,
-		E_DNS_BADQUERY = -40010,
-		E_DNS_SERVER_SHUTDOWN = -40011
+		E_UNKNOWN_CMD = -50001,
+		E_INVALID_DOMAIN = -50002,
+		E_INVALID_IPV4 = -50003,
+		E_DNSLOOKUP_RETURN_NO_IP = -50004,
+		E_DNS_TEMPORARY_ERROR = -50005,
+		E_DNS_PROTOCOL_ERROR = -50006,
+		E_DNS_DOMAIN_NAME_NOT_EXISTS = -50007,
+		E_DNS_DOMAIN_NO_DATA = -50008,
+		E_DNS_NOMEM = -50009,
+		E_DNS_BADQUERY = -50010,
+		E_DNS_SERVER_SHUTDOWN = -50011
 	};
 
 	const static int dns_error_map[] = {
@@ -314,7 +314,7 @@ namespace roger {
 	struct forward_ctx :
 		public wawo::ref_base
 	{
-		forward_ctx():ndownbytes(0) {
+		forward_ctx() {
 			TRACE_SERVER_SIDE_CTX("forward_ctx::forward_ctx()");
 		}
 		~forward_ctx() {
@@ -328,7 +328,6 @@ namespace roger {
 		WWRP<wawo::packet> client_up_first_packet; //first req packet
 		packet_deque up_to_server_packets;
 		packet_deque down_to_stream_packets;
-		u32_t ndownbytes;
 		server_state state;
 		ctx_write_state up_state;
 		ctx_write_state down_state;
@@ -370,8 +369,8 @@ namespace roger {
 	{
 		HTTP_RESP_RELAY_SUCCEED,
 		HTTP_RESP_PROXY_NOT_AVAILABLE_FAILED,
-		HTTP_RESP_BAD_REQUEST,
 		HTTP_RESP_CONNECT_HOST_FAILED,
+		HTTP_RESP_BAD_REQUEST,
 		HTTP_RESP_SERVER_NO_RESPONSE,
 		HTTP_RESP_SERVER_RESPONSE_PARSED_FAILED,
 		HTTP_RESP_PROXY_PIPE_ERROR

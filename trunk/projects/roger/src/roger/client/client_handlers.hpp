@@ -488,7 +488,7 @@ namespace roger {
 				WAWO_ASSERT(downp->len() == 0);
 				if (pctx->reqs.size()) {
 					WWRP<wawo::net::http::message>& m = pctx->reqs.front();
-					WAWO_WARN("[roger][https]connect to url: %s failed for: %d, cancel reqs: %u", m->url.c_str(), rcode, pctx->reqs.size());
+					WAWO_WARN("[roger][http]connect to url: %s failed for: %d, cancel reqs: %u", m->url.c_str(), rcode, pctx->reqs.size());
 					cancel_all_ctx_reqs(pctx, CANCEL_CODE_CONNECT_HOST_FAILED);
 					WAWO_ASSERT(pctx->reqs.size() == 0);
 				}
