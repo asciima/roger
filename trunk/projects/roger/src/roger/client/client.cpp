@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
 		_Test_VLD();
 #endif
 
+
+
 	WAWO_WARN("[roger]client start...");
 	if (argc != 4) {
 		WAWO_ERR("[roger]invalid parameter, usage: roger server_ip port");
