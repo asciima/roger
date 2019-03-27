@@ -270,7 +270,7 @@ namespace roger {
 		fctx->dst_addrv4.setfamily(F_AF_INET);
 
 		fctx->state = DIAL_SERVER;
-		fctx->ts_server_connect_start = wawo::time::curr_microseconds();
+		fctx->ts_server_connect_start = wawo::curr_microseconds();
 
 		const std::string dialurl = "tcp://" + fctx->dst_addrv4.dotip() + ":"+ std::to_string(fctx->dst_addrv4.port());
 		WWRP<wawo::net::channel_future> dial_f = wawo::net::socket::dial(dialurl, [fctx](WWRP<wawo::net::channel> const& ch) {
@@ -292,7 +292,7 @@ namespace roger {
 			}
 
 			fctx->ch_stream_ctx->event_poller()->execute([fctx,rt]() {
-				fctx->ts_server_connect_done = wawo::time::curr_microseconds();
+				fctx->ts_server_connect_done = wawo::curr_microseconds();
 				WAWO_ASSERT(fctx->state == DIAL_SERVER);
 				if (rt != wawo::OK) {
 					WAWO_ASSERT(fctx != NULL);
@@ -327,7 +327,7 @@ namespace roger {
 	inline static void dns_resolve_error(int const& code, WWRP<wawo::ref_base > const& cookie_) {
 		WAWO_ASSERT(cookie_ != NULL);
 		WWRP<forward_ctx> fctx = wawo::static_pointer_cast<forward_ctx>(cookie_);
-		fctx->ts_dns_lookup_done = wawo::time::curr_microseconds();
+		fctx->ts_dns_lookup_done = wawo::curr_microseconds();
 		WAWO_ASSERT(code <= E_DNSLOOKUP_RETURN_NO_IP && code>= E_DNS_SERVER_SHUTDOWN);
 
 		if (code == E_DNS_TEMPORARY_ERROR && (fctx->dns_try_time) < 5) {
@@ -379,7 +379,7 @@ namespace roger {
 			dns_resolve_error(roger::E_DNSLOOKUP_RETURN_NO_IP, cookie_);
 		} else {
 			fctx->ch_stream_ctx->event_poller()->execute([fctx, ipv4]() {
-				fctx->ts_dns_lookup_done = wawo::time::curr_microseconds();
+				fctx->ts_dns_lookup_done = wawo::curr_microseconds();
 				WAWO_ASSERT(fctx->query != NULL);
 				fctx->query = NULL;
 				fctx->dst_ipv4 = ipv4;
@@ -510,7 +510,7 @@ namespace roger {
 					WAWO_ASSERT(nbytes == dlen[0]);
 					fctx->state = LOOKUP_SERVER_NAME;
 					fctx->dst_domain = std::string(domain, nbytes);
-					fctx->ts_dns_lookup_start = wawo::time::curr_microseconds();
+					fctx->ts_dns_lookup_start = wawo::curr_microseconds();
 					fctx->dns_try_time = 1;
 					fctx->query = dns_resolver::instance()->async_resolve(fctx->dst_domain, fctx, &dns_resolve_success, &dns_resolve_error);
 					if(fctx->query == NULL) {

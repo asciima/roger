@@ -931,7 +931,7 @@ namespace roger {
 
 						if (ppctx->type == T_HTTP) {
 							ppctx->http_tp_last_req = std::chrono::time_point_cast<roger_http_dur_t>(roger_http_clock_t::now());
-							WWRP<timer> _http_timer = wawo::make_ref<timer>(roger_http_dur_t(15), [ppctx](WWRP<timer> const& t) {
+							WWRP<timer> _http_timer = wawo::make_ref<timer>(roger_http_dur_t(500), [ppctx](WWRP<timer> const& t) {
 								if (ppctx->stream_read_closed == true) {
 									return;
 								}
@@ -941,7 +941,7 @@ namespace roger {
 								}
 								const roger_http_timepoint_t now = std::chrono::time_point_cast<roger_http_dur_t>(roger_http_clock_t::now());
 								const roger_http_dur_t diff = now - ppctx->http_tp_last_req;
-								if (diff.count() < 30) {
+								if (diff.count() < (30*1000) ) {
 									ppctx->ch_client_ctx->event_poller()->launch(t);
 									return;
 								}
